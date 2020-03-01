@@ -1,0 +1,41 @@
+name: Test
+on: [push, pull_request]
+jobs:
+
+  test:
+    name: Go ${{ matrix.go }} Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+        go:
+          - '1.11'
+          - '1.12'
+          - '1.13'
+          - '1.14'
+          - '1'
+
+    steps:
+
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: go mod download
+        env:
+          GO111MODULE: "on"
+        shell: bash
+
+      - name: Test
+        run: go test -race ./...
+        env:
+          GO111MODULE: "on"
+        shell: bash
