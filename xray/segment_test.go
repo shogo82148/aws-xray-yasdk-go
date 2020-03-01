@@ -20,3 +20,19 @@ func TestNewSegmentID(t *testing.T) {
 		t.Errorf("id should match %q, but got %q", pattern, id)
 	}
 }
+
+func TestBeginSegment(t *testing.T) {
+	ctx, td := NewTestDaemon()
+	defer td.Close()
+
+	ctx, seg := BeginSegment(ctx, "foobar")
+	seg.Close()
+
+	s, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	if s.Name != "foobar" {
+		t.Errorf("name: want %q, got %q", "foobar", s.Name)
+	}
+}

@@ -20,6 +20,7 @@ func (k *contextKey) String() string { return "xray context value " + k.name }
 
 var (
 	segmentContextKey = &contextKey{"segment"}
+	clientContextKey  = &contextKey{"client"}
 )
 
 // Segment is a segment.
@@ -76,7 +77,11 @@ func (seg *Segment) Close() {
 	seg.endTime = now
 	seg.mu.Unlock()
 
-	defaultClient.Emit(seg.ctx, seg)
+	client := seg.ctx.Value(clientContextKey)
+	if client == nil {
+		client = defaultClient
+	}
+	client.(*Client).Emit(seg.ctx, seg)
 }
 
 func (seg *Segment) serialize() *schema.Segment {

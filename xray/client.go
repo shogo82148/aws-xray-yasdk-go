@@ -17,26 +17,33 @@ var dialer = net.Dialer{
 	Timeout: emitTimeout,
 }
 
-var defaultClient = New("127.0.0.1:2000")
+var defaultClient = New(nil)
 
-// Client is a client for X-Ray daemon.
+// Client is a client for AWS X-Ray daemon.
 type Client struct {
-	mu   sync.Mutex
-	addr string
-	conn *net.UDPConn
+	// the address of the AWS X-Ray daemon
+	tcp string
+	udp string
+
 	pool sync.Pool
+
+	mu   sync.Mutex
+	conn net.Conn
 }
 
 // New returns a new Client.
-func New(addr string) *Client {
-	return &Client{
-		addr: addr,
+func New(config *Config) *Client {
+	p := config.daemonEndpoints()
+	client := &Client{
+		tcp: p.TCP,
+		udp: p.UDP,
 		pool: sync.Pool{
 			New: func() interface{} {
 				return new(bytes.Buffer)
 			},
 		},
 	}
+	return client
 }
 
 // Emit sends seg to X-Ray daemon.
@@ -59,13 +66,13 @@ func (c *Client) Emit(ctx context.Context, seg *Segment) {
 		emitCtx, cancel := context.WithTimeout(context.Background(), emitTimeout)
 		defer cancel()
 
-		conn, err := dialer.DialContext(emitCtx, "udp", c.addr)
+		conn, err := dialer.DialContext(emitCtx, "udp", c.udp)
 		if err != nil {
 			// TODO: @shogo82148 log
 			log.Println(err)
 			return
 		}
-		c.conn = conn.(*net.UDPConn)
+		c.conn = conn
 	}
 	if _, err := c.conn.Write(buf.Bytes()); err != nil {
 		// TODO: @shogo82148 log
