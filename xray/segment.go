@@ -17,5 +17,15 @@ func NewTraceID() string {
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("1-%08x-%02x", time.Now().Unix(), r)
+	return fmt.Sprintf("1-%08x-%x", time.Now().Unix(), r)
+}
+
+// NewSegmentID generates a string format of segment ID.
+func NewSegmentID() string {
+	var r [8]byte
+	_, err := rand.Read(r[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", r)
 }
