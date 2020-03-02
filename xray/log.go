@@ -62,7 +62,7 @@ func (ll LogLevel) String() string {
 // SetLogger updates the global logger.
 func SetLogger(logger Logger) {
 	if logger == nil {
-		panic("logger should not nil")
+		panic("logger should not be nil")
 	}
 	globalLogger = logger
 }
