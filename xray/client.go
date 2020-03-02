@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"log"
 	"net"
 	"sync"
 	"time"
@@ -55,8 +54,7 @@ func (c *Client) Emit(ctx context.Context, seg *Segment) {
 	enc := json.NewEncoder(buf)
 	data := seg.serialize()
 	if err := enc.Encode(data); err != nil {
-		// TODO: @shogo82148 log
-		log.Println(err)
+		Errorf(ctx, "failed to encode: %v", err)
 		return
 	}
 
@@ -68,14 +66,13 @@ func (c *Client) Emit(ctx context.Context, seg *Segment) {
 
 		conn, err := dialer.DialContext(emitCtx, "udp", c.udp)
 		if err != nil {
-			// TODO: @shogo82148 log
-			log.Println(err)
+			Errorf(ctx, "failed to dial: %v", err)
 			return
 		}
 		c.conn = conn
 	}
 	if _, err := c.conn.Write(buf.Bytes()); err != nil {
-		// TODO: @shogo82148 log
+		Errorf(ctx, "failed to write: %v", err)
 		return
 	}
 }
