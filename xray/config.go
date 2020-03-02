@@ -18,7 +18,6 @@ type Config struct {
 	// AWS_XRAY_TRACING_NAME
 	// AWS_XRAY_CONTEXT_MISSING
 	// AWS_XRAY_TRACING_NAME
-	// AWS_XRAY_DEBUG_MODE
 }
 
 type daemonEndpoints struct {
