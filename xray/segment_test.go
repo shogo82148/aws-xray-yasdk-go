@@ -26,6 +26,7 @@ func TestBeginSegment(t *testing.T) {
 	defer td.Close()
 
 	ctx, seg := BeginSegment(ctx, "foobar")
+	_ = ctx // do something using ctx
 	seg.Close()
 
 	s, err := td.Recv()
@@ -43,6 +44,7 @@ func TestBeginSubsegment(t *testing.T) {
 
 	ctx, root := BeginSegment(ctx, "root")
 	ctx, seg := BeginSubsegment(ctx, "subsegment")
+	_ = ctx // do something using ctx
 	seg.Close()
 	root.Close()
 
