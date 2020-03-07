@@ -56,6 +56,9 @@ type Segment struct {
 	// aws object with information about the AWS resource on which your application served the request.
 	AWS *AWS `json:"aws,omitempty"`
 
+	// SQL is information for queries that your application makes to an SQL database.
+	SQL *SQL `json:"sql,omitempty"`
+
 	// boolean indicating that a client error occurred (response status code was 4XX Client Error).
 	Error bool `json:"error,omitempty"`
 
@@ -231,4 +234,31 @@ type StackFrame struct {
 
 	// The function or method name.
 	Label string `json:"label,omitempty"`
+}
+
+// SQL is information for queries that your application makes to an SQL database.
+type SQL struct {
+	// For SQL Server or other database connections that don't use URL connection strings, record the connection string, excluding passwords.
+	ConnectionString string `json:"connection_string,omitempty"`
+
+	// For a database connection that uses a URL connection string, record the URL, excluding passwords.
+	URL string `json:"url,omitempty"`
+
+	// The database query, with any user provided values removed or replaced by a placeholder.
+	SanitizedQuery string `json:"sanitized_query,omitempty"`
+
+	// The name of the database engine.
+	DatabaseType string `json:"database_type,omitempty"`
+
+	// The version number of the database engine.
+	DatabaseVersion string `json:"database_version,omitempty"`
+
+	// The name and version number of the database engine driver that your application uses.
+	DriverVersion string `json:"driver_version,omitempty"`
+
+	// The database username.
+	User string `json:"user,omitempty"`
+
+	// "call" if the query used a PreparedCall; "statement" if the query used a PreparedStatement.
+	Preparation string `json:"preparation,omitempty"`
 }
