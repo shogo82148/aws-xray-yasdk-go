@@ -31,6 +31,7 @@ type Segment struct {
 	name      string
 	id        string
 	traceID   string
+	parent    *Segment
 	startTime time.Time
 	endTime   time.Time
 }
@@ -65,6 +66,26 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 		name:      name, // TODO: @shogo82148 sanitize the name
 		id:        NewSegmentID(),
 		traceID:   NewTraceID(),
+		startTime: now,
+	}
+	ctx = context.WithValue(ctx, segmentContextKey, seg)
+	return ctx, seg
+}
+
+// BeginSubsegment creates a new Segment for a given name and context.
+//
+// Caller should close the segment when the work is done.
+func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segment) {
+	now := time.Now()
+	parent := ctx.Value(segmentContextKey).(*Segment)
+	if parent == nil {
+		panic("CONTEXT MISSING!") // TODO: see AWS_XRAY_CONTEXT_MISSING
+	}
+	seg := &Segment{
+		ctx:       ctx,
+		name:      name, // TODO: @shogo82148 sanitize the name
+		id:        NewSegmentID(),
+		parent:    parent,
 		startTime: now,
 	}
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
