@@ -109,7 +109,7 @@ type HTTPRequest struct {
 
 	// The IP address of the requester.
 	// Can be retrieved from the IP packet's Source Address or, for forwarded requests, from an X-Forwarded-For header.
-	ClientIP string `json:"client_ip,emitempty"`
+	ClientIP string `json:"client_ip,omitempty"`
 
 	// (segments only) boolean indicating that the client_ip was read from an X-Forwarded-For header
 	// and is not reliable as it could have been forged.
