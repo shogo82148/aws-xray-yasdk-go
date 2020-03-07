@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -34,6 +35,12 @@ type Segment struct {
 	parent    *Segment
 	startTime time.Time
 	endTime   time.Time
+
+	// error information
+	error    bool
+	throttle bool
+	fault    bool
+	cause    *schema.Cause
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -54,6 +61,11 @@ func NewSegmentID() string {
 		panic(err)
 	}
 	return fmt.Sprintf("%x", r)
+}
+
+// ContextSegment return the segment of current context.
+func ContextSegment(ctx context.Context) *Segment {
+	return ctx.Value(segmentContextKey).(*Segment)
 }
 
 // BeginSegment creates a new Segment for a given name and context.
@@ -118,6 +130,11 @@ func (seg *Segment) serialize() *schema.Segment {
 		ID:        seg.id,
 		TraceID:   seg.traceID,
 		StartTime: start,
+
+		Error:    seg.error,
+		Throttle: seg.throttle,
+		Fault:    seg.fault,
+		Cause:    seg.cause,
 	}
 
 	if seg.inProgress() {
@@ -144,4 +161,43 @@ func (seg *Segment) emit() {
 		client = defaultClient
 	}
 	client.(*Client).Emit(seg.ctx, seg)
+}
+
+func newExceptionID() string {
+	var r [8]byte
+	_, err := rand.Read(r[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", r)
+}
+
+// AddError sets error.
+func (seg *Segment) AddError(err error) bool {
+	if err == nil {
+		return false
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+
+	seg.fault = true
+	if seg.cause == nil {
+		seg.cause = &schema.Cause{}
+	}
+	seg.cause.WorkingDirectory, _ = os.Getwd()
+	seg.cause.Exceptions = append(seg.cause.Exceptions, schema.Exception{
+		ID:      newExceptionID(),
+		Type:    fmt.Sprintf("%T", err),
+		Message: err.Error(),
+	})
+	return true
+}
+
+// AddError sets the segment of the current context an error.
+func AddError(ctx context.Context, err error) bool {
+	seg := ContextSegment(ctx)
+	if seg == nil {
+		return err != nil
+	}
+	return seg.AddError(err)
 }
