@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"errors"
 	"regexp"
 	"testing"
 )
@@ -72,5 +73,27 @@ func TestBeginSubsegment(t *testing.T) {
 	}
 	if s.Name != "root" {
 		t.Errorf("name: want %q, got %q", "root", s.Name)
+	}
+}
+
+func TestAddError(t *testing.T) {
+	ctx, td := NewTestDaemon()
+	defer td.Close()
+
+	ctx, seg := BeginSegment(ctx, "foobar")
+	if !AddError(ctx, errors.New("some error")) {
+		t.Error("want true, got false")
+	}
+	seg.Close()
+
+	s, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	if !s.Fault {
+		t.Error("want fault is true, but not")
+	}
+	if s.Cause.Exceptions[0].Message != "some error" {
+		t.Errorf("want %q, got %q", "some error", s.Cause.Exceptions[0].Message)
 	}
 }
