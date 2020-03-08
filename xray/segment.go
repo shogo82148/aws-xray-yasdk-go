@@ -11,6 +11,8 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
+var nowFunc func() time.Time = time.Now
+
 // contextKey is a value for use with context.WithValue. It's used as
 // a pointer so it fits in an interface{} without allocation.
 type contextKey struct {
@@ -25,6 +27,13 @@ var (
 	loggerContextKey  = &contextKey{"logger"}
 )
 
+type segmentStatus int
+
+const (
+	segmentStatusInit segmentStatus = iota
+	segmentStatusEmitted
+)
+
 // Segment is a segment.
 type Segment struct {
 	mu        sync.RWMutex
@@ -34,6 +43,7 @@ type Segment struct {
 	traceID   string
 	startTime time.Time
 	endTime   time.Time
+	status    segmentStatus
 
 	// parent segment
 	// if the segment is the root, the parent is nil.
@@ -45,6 +55,11 @@ type Segment struct {
 
 	// subsegments that are not completed.
 	subsegments []*Segment
+
+	// statics of the subsegments, used in the root.
+	totalSegments   int
+	closedSegments  int
+	emittedSegments int
 
 	// error information
 	error    bool
@@ -60,7 +75,7 @@ func NewTraceID() string {
 	if err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("1-%08x-%x", time.Now().Unix(), r)
+	return fmt.Sprintf("1-%08x-%x", nowFunc().Unix(), r)
 }
 
 // NewSegmentID generates a string format of segment ID.
@@ -82,13 +97,14 @@ func ContextSegment(ctx context.Context) *Segment {
 //
 // Caller should close the segment when the work is done.
 func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) {
-	now := time.Now()
+	now := nowFunc()
 	seg := &Segment{
-		ctx:       ctx,
-		name:      name, // TODO: @shogo82148 sanitize the name
-		id:        NewSegmentID(),
-		traceID:   NewTraceID(),
-		startTime: now,
+		ctx:           ctx,
+		name:          name, // TODO: @shogo82148 sanitize the name
+		id:            NewSegmentID(),
+		traceID:       NewTraceID(),
+		startTime:     now,
+		totalSegments: 1,
 	}
 	seg.root = seg
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
@@ -99,24 +115,30 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 //
 // Caller should close the segment when the work is done.
 func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segment) {
-	now := time.Now()
+	now := nowFunc()
 	parent := ctx.Value(segmentContextKey).(*Segment)
 	if parent == nil {
 		panic("CONTEXT MISSING!") // TODO: see AWS_XRAY_CONTEXT_MISSING
 	}
+	root := parent.root
 	seg := &Segment{
 		ctx:       ctx,
 		name:      name, // TODO: @shogo82148 sanitize the name
 		id:        NewSegmentID(),
 		parent:    parent,
-		root:      parent.root,
+		root:      root,
 		traceID:   parent.traceID,
 		startTime: now,
 	}
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
 
-	parent.mu.Lock()
-	defer parent.mu.Unlock()
+	root.mu.Lock()
+	defer root.mu.Unlock()
+	if parent != root {
+		parent.mu.Lock()
+		defer parent.mu.Unlock()
+	}
+	root.totalSegments++
 	parent.subsegments = append(parent.subsegments, seg)
 
 	return ctx, seg
@@ -129,47 +151,24 @@ func (seg *Segment) Close() {
 	} else {
 		Debugf(seg.ctx, "Closing segment named %s", seg.name)
 	}
-	now := time.Now()
-	seg.mu.Lock()
-	seg.endTime = now
-	seg.mu.Unlock()
-
+	seg.close()
 	seg.emit()
+}
+
+func (seg *Segment) close() {
+	root := seg.root
+	root.mu.Lock()
+	defer root.mu.Unlock()
+	if seg != root {
+		seg.mu.Lock()
+		defer seg.mu.Unlock()
+	}
+	root.closedSegments++
+	seg.endTime = nowFunc()
 }
 
 func (seg *Segment) isRoot() bool {
 	return seg.parent == nil
-}
-
-func (seg *Segment) serialize() *schema.Segment {
-	seg.mu.RLock()
-	defer seg.mu.RUnlock()
-
-	start := float64(seg.startTime.Unix()) + float64(seg.startTime.Nanosecond())/1e9
-	ret := &schema.Segment{
-		Name:      seg.name,
-		ID:        seg.id,
-		TraceID:   seg.traceID,
-		StartTime: start,
-
-		Error:    seg.error,
-		Throttle: seg.throttle,
-		Fault:    seg.fault,
-		Cause:    seg.cause,
-	}
-
-	if seg.inProgress() {
-		ret.InProgress = true
-	} else {
-		ret.EndTime = start + seg.endTime.Sub(seg.startTime).Seconds()
-	}
-
-	if seg.parent != nil {
-		ret.Type = "subsegment"
-		ret.ParentID = seg.parent.id
-	}
-
-	return ret
 }
 
 func (seg *Segment) inProgress() bool {

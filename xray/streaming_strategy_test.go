@@ -11,11 +11,13 @@ import (
 func TestStreamingStrategyBatchAll(t *testing.T) {
 	now := time.Date(2001, time.September, 9, 1, 46, 40, 0, time.UTC)
 	seg := &Segment{
-		name:      "root segment",
-		id:        "03babb4ba280be51",
-		traceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-		startTime: now,
-		endTime:   now.Add(time.Second),
+		name:           "root segment",
+		id:             "03babb4ba280be51",
+		traceID:        "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+		startTime:      now,
+		endTime:        now.Add(time.Second),
+		totalSegments:  4,
+		closedSegments: 4,
 	}
 	seg.root = seg
 	child1 := &Segment{
@@ -95,42 +97,32 @@ func TestStreamingStrategyBatchAll(t *testing.T) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
 	}
+	if seg.emittedSegments != 4 {
+		t.Errorf("want %d, got %d", 4, seg.emittedSegments)
+	}
+	if child1.status != segmentStatusEmitted {
+		t.Errorf("want %d, got %d", segmentStatusEmitted, child1.status)
+	}
+	if child2.status != segmentStatusEmitted {
+		t.Errorf("want %d, got %d", segmentStatusEmitted, child2.status)
+	}
+	if grandchild.status != segmentStatusEmitted {
+		t.Errorf("want %d, got %d", segmentStatusEmitted, grandchild.status)
+	}
 }
 
 func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 	now := time.Date(2001, time.September, 9, 1, 46, 40, 0, time.UTC)
-	strategy := NewStreamingStrategyLimitSubsegment(0)
 
-	t.Run("root segment", func(t *testing.T) {
+	// create the segment that have one subsegment.
+	newSegment := func() *Segment {
 		seg := &Segment{
-			name:      "root segment",
-			id:        "03babb4ba280be51",
-			traceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-			startTime: now,
-			endTime:   now.Add(time.Second),
-		}
-		seg.root = seg
-		got := strategy.StreamSegment(seg)
-		want := []*schema.Segment{
-			{
-				Name:      "root segment",
-				ID:        "03babb4ba280be51",
-				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-				StartTime: 1000000000,
-				EndTime:   1000000001,
-			},
-		}
-		if diff := cmp.Diff(want, got); diff != "" {
-			t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
-		}
-	})
-
-	t.Run("has parent", func(t *testing.T) {
-		seg := &Segment{
-			name:      "root segment",
-			id:        "03babb4ba280be51",
-			traceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-			startTime: now,
+			name:           "root segment",
+			id:             "03babb4ba280be51",
+			traceID:        "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+			startTime:      now,
+			totalSegments:  2,
+			closedSegments: 1,
 		}
 		seg.root = seg
 		child1 := &Segment{
@@ -143,22 +135,19 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 			endTime:   now.Add(time.Second),
 		}
 		seg.subsegments = append(seg.subsegments, child1)
+		return seg
+	}
 
-		got := strategy.StreamSegment(child1)
+	t.Run("limit 0", func(t *testing.T) {
+		seg := newSegment()
+		strategy := NewStreamingStrategyLimitSubsegment(0)
+		got := strategy.StreamSegment(seg.subsegments[0])
 		want := []*schema.Segment{
-			// TODO: @shogo82148
-			// {
-			// 	Name:       "root segment",
-			// 	ID:         "03babb4ba280be51",
-			// 	TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-			// 	StartTime:  1000000000,
-			// 	InProgress: true,
-			// },
 			{
 				Name:      "child1",
-				Type:      "subsegment",
 				ID:        "acc82ea453399569",
 				ParentID:  "03babb4ba280be51",
+				Type:      "subsegment",
 				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
 				StartTime: 1000000000,
 				EndTime:   1000000001,
@@ -166,6 +155,41 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 		}
 		if diff := cmp.Diff(want, got); diff != "" {
 			t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
+		}
+		if seg.emittedSegments != 1 {
+			t.Errorf("want %d, got %d", 1, seg.emittedSegments)
+		}
+	})
+
+	t.Run("limit 1", func(t *testing.T) {
+		seg := newSegment()
+		strategy := NewStreamingStrategyLimitSubsegment(1)
+		if got := strategy.StreamSegment(seg.subsegments[0]); got != nil {
+			t.Errorf("want nil, got %v", got)
+		}
+		got := strategy.StreamSegment(seg)
+		want := []*schema.Segment{
+			{
+				Name:       "root segment",
+				ID:         "03babb4ba280be51",
+				TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+				StartTime:  1000000000,
+				InProgress: true,
+				Subsegments: []*schema.Segment{
+					{
+						Name:      "child1",
+						ID:        "acc82ea453399569",
+						StartTime: 1000000000,
+						EndTime:   1000000001,
+					},
+				},
+			},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
+		}
+		if seg.emittedSegments != 1 {
+			t.Errorf("want %d, got %d", 1, seg.emittedSegments)
 		}
 	})
 }

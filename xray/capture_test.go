@@ -3,6 +3,9 @@ package xray
 import (
 	"context"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 func TestCapture(t *testing.T) {
@@ -18,19 +21,29 @@ func TestCapture(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s, err := td.Recv()
+	want := &schema.Segment{
+		Name:    "root",
+		ID:      seg.id,
+		TraceID: seg.traceID,
+		Subsegments: []*schema.Segment{
+			{
+				Name: "capture",
+			},
+		},
+	}
+	got, err := td.Recv()
 	if err != nil {
 		t.Error(err)
-	}
-	if s.Name != "capture" {
-		t.Errorf("want %q, got %q", "capture", s.Name)
 	}
 
-	s, err = td.Recv()
-	if err != nil {
-		t.Error(err)
-	}
-	if s.Name != "root" {
-		t.Errorf("name: want %q, got %q", "root", s.Name)
+	// ignore time
+	got.StartTime = 0
+	got.EndTime = 0
+	got.Subsegments[0].ID = ""
+	got.Subsegments[0].StartTime = 0
+	got.Subsegments[0].EndTime = 0
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }

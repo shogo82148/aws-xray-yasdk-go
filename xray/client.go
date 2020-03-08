@@ -7,6 +7,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 const emitTimeout = 100 * time.Millisecond
@@ -26,6 +28,8 @@ type Client struct {
 
 	pool sync.Pool
 
+	streamingStrategy StreamingStrategy
+
 	mu   sync.Mutex
 	conn net.Conn
 }
@@ -33,6 +37,10 @@ type Client struct {
 // New returns a new Client.
 func New(config *Config) *Client {
 	p := config.daemonEndpoints()
+	streamingStrategy := NewStreamingStrategyLimitSubsegment(20)
+	if config != nil && config.StreamingStrategy != nil {
+		streamingStrategy = config.StreamingStrategy
+	}
 	client := &Client{
 		tcp: p.TCP,
 		udp: p.UDP,
@@ -41,19 +49,25 @@ func New(config *Config) *Client {
 				return new(bytes.Buffer)
 			},
 		},
+		streamingStrategy: streamingStrategy,
 	}
 	return client
 }
 
 // Emit sends seg to X-Ray daemon.
 func (c *Client) Emit(ctx context.Context, seg *Segment) {
+	for _, data := range c.streamingStrategy.StreamSegment(seg) {
+		c.emit(ctx, data)
+	}
+}
+
+func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
 	buf := c.pool.Get().(*bytes.Buffer)
 	defer c.pool.Put(buf)
 	buf.Reset()
 	buf.Write(header)
 	enc := json.NewEncoder(buf)
-	data := seg.serialize()
-	if err := enc.Encode(data); err != nil {
+	if err := enc.Encode(seg); err != nil {
 		Errorf(ctx, "failed to encode: %v", err)
 		return
 	}
