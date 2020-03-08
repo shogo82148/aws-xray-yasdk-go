@@ -156,6 +156,7 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 			// },
 			{
 				Name:      "child1",
+				Type:      "subsegment",
 				ID:        "acc82ea453399569",
 				ParentID:  "03babb4ba280be51",
 				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
