@@ -3,6 +3,7 @@ package xrayhttp
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptrace"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
@@ -58,6 +59,9 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if !isEmptyHost {
 		seg.SetNamespace("remote")
 	}
+
+	trace := newClientTrace(ctx)
+	ctx = httptrace.WithClientTrace(ctx, trace.httptrace)
 	req = req.WithContext(ctx)
 	resp, err := rt.Base.RoundTrip(req)
 	seg.AddError(err)
