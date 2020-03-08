@@ -34,7 +34,9 @@ func TestClient(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("hello"))
+		if _, err := w.Write([]byte("hello")); err != nil {
+			panic(err)
+		}
 	}))
 	defer ts.Close()
 

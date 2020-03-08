@@ -11,7 +11,10 @@ import (
 
 func TestTestDaemon(t *testing.T) {
 	_, td := NewTestDaemon(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
+		_, err := w.Write([]byte("hello"))
+		if err != nil {
+			panic(err)
+		}
 	}))
 	defer td.Close()
 
@@ -19,7 +22,7 @@ func TestTestDaemon(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Write([]byte(`{"format":"json","version":1}
+	_, err = conn.Write([]byte(`{"format":"json","version":1}
 {
 	"name" : "example.com",
 	"id" : "70de5b6f19ff9a0a",
@@ -27,6 +30,9 @@ func TestTestDaemon(t *testing.T) {
 	"trace_id" : "1-581cf771-a006649127e371903a2de979",
 	"end_time" : 1.0E9
 }`))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := td.Recv()
 	if err != nil {
