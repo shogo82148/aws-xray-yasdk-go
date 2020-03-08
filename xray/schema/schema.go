@@ -78,7 +78,7 @@ type Segment struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 
 	// array of subsegment objects.
-	Subsegments []Segment `json:"subsegment,omitempty"`
+	Subsegments []*Segment `json:"subsegment,omitempty"`
 
 	// array of subsegment IDs that identifies subsegments with the same parent that completed prior to this subsegment.
 	PrecursorIDs []string `json:"precursor_ids,omitempty"`

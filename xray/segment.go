@@ -32,9 +32,19 @@ type Segment struct {
 	name      string
 	id        string
 	traceID   string
-	parent    *Segment
 	startTime time.Time
 	endTime   time.Time
+
+	// parent segment
+	// if the segment is the root, the parent is nil.
+	parent *Segment
+
+	// root segment
+	// if the segment is the root, the root points the segment it self.
+	root *Segment
+
+	// subsegments that are not completed.
+	subsegments []*Segment
 
 	// error information
 	error    bool
@@ -80,6 +90,7 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 		traceID:   NewTraceID(),
 		startTime: now,
 	}
+	seg.root = seg
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
 	return ctx, seg
 }
@@ -98,10 +109,16 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 		name:      name, // TODO: @shogo82148 sanitize the name
 		id:        NewSegmentID(),
 		parent:    parent,
+		root:      parent.root,
 		traceID:   parent.traceID,
 		startTime: now,
 	}
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
+
+	parent.mu.Lock()
+	defer parent.mu.Unlock()
+	parent.subsegments = append(parent.subsegments, seg)
+
 	return ctx, seg
 }
 
@@ -118,6 +135,10 @@ func (seg *Segment) Close() {
 	seg.mu.Unlock()
 
 	seg.emit()
+}
+
+func (seg *Segment) isRoot() bool {
+	return seg.parent == nil
 }
 
 func (seg *Segment) serialize() *schema.Segment {
