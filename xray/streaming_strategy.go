@@ -129,7 +129,7 @@ func (s *streamingStrategyLimitSubsegment) StreamSegment(seg *Segment) []*schema
 	}
 
 	if seg.parent != nil {
-		ret.ParentID = seg.id
+		ret.ParentID = seg.parent.id
 	}
 
 	return []*schema.Segment{ret}

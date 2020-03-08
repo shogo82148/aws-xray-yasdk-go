@@ -146,16 +146,18 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 
 		got := strategy.StreamSegment(child1)
 		want := []*schema.Segment{
-			{
-				Name:       "root segment",
-				ID:         "03babb4ba280be51",
-				TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
-				StartTime:  1000000000,
-				InProgress: true,
-			},
+			// TODO: @shogo82148
+			// {
+			// 	Name:       "root segment",
+			// 	ID:         "03babb4ba280be51",
+			// 	TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+			// 	StartTime:  1000000000,
+			// 	InProgress: true,
+			// },
 			{
 				Name:      "child1",
 				ID:        "acc82ea453399569",
+				ParentID:  "03babb4ba280be51",
 				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
 				StartTime: 1000000000,
 				EndTime:   1000000001,
