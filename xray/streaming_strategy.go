@@ -37,6 +37,8 @@ func serialize(seg *Segment) *schema.Segment {
 		Throttle: seg.throttle,
 		Fault:    seg.fault,
 		Cause:    seg.cause,
+
+		Namespace: seg.namespace,
 	}
 
 	if seg.inProgress() {
@@ -89,6 +91,8 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 		Throttle: seg.throttle,
 		Fault:    seg.fault,
 		Cause:    seg.cause,
+
+		Namespace: seg.namespace,
 	}
 
 	if seg.inProgress() {

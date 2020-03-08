@@ -71,6 +71,7 @@ func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
 		Errorf(ctx, "failed to encode: %v", err)
 		return
 	}
+	Debugf(ctx, "emit: %s", buf.Bytes()[len(header):])
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
