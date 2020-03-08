@@ -23,7 +23,7 @@ type Segment struct {
 
 	// TraceID is a unique identifier that connects all segments and subsegments originating
 	// from a single client request. Trace ID Format.
-	TraceID string `json:"trace_id"`
+	TraceID string `json:"trace_id,omitempty"`
 
 	// StartTime is a number that is the time the segment was created,
 	// in floating point seconds in epoch time.
@@ -78,7 +78,7 @@ type Segment struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
 
 	// array of subsegment objects.
-	Subsegments []*Segment `json:"subsegment,omitempty"`
+	Subsegments []*Segment `json:"subsegments,omitempty"`
 
 	// array of subsegment IDs that identifies subsegments with the same parent that completed prior to this subsegment.
 	PrecursorIDs []string `json:"precursor_ids,omitempty"`
