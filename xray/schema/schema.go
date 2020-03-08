@@ -50,6 +50,9 @@ type Segment struct {
 	// subsegment. Required only if sending a subsegment separately.
 	Type string `json:"type,omitempty"`
 
+	// aws for AWS SDK calls; remote for other downstream calls.
+	Namespace string `json:"namespace,omitempty"`
+
 	// http objects with information about the original HTTP request.
 	HTTP *HTTP `json:"http,omitempty"`
 

@@ -66,6 +66,8 @@ type Segment struct {
 	throttle bool
 	fault    bool
 	cause    *schema.Cause
+
+	namespace string
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -220,4 +222,11 @@ func AddError(ctx context.Context, err error) bool {
 		return err != nil
 	}
 	return seg.AddError(err)
+}
+
+// SetNamespace sets namespace
+func (seg *Segment) SetNamespace(namespace string) {
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.namespace = namespace
 }
