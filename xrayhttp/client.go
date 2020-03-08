@@ -14,6 +14,9 @@ const emptyHostRename = "empty_host_error"
 // defaulting to http.DefaultClient, with roundtripper wrapped
 // with xrayhttp.RoundTripper.
 func Client(client *http.Client) *http.Client {
+	if client == nil {
+		client = http.DefaultClient
+	}
 	ret := *client
 	ret.Transport = RoundTripper(ret.Transport)
 	return &ret
@@ -23,9 +26,7 @@ func Client(client *http.Client) *http.Client {
 // sets HTTP-specific xray fields, and adds the trace header to the outbound request.
 func RoundTripper(rt http.RoundTripper) http.RoundTripper {
 	if rt == nil {
-		return &roundtripper{
-			Base: http.DefaultTransport,
-		}
+		rt = http.DefaultTransport
 	}
 	return &roundtripper{
 		Base: rt,
