@@ -33,7 +33,7 @@ func TestBeginSegment(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()
 
-	ctx, td := NewTestDaemon()
+	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
 	ctx, seg := BeginSegment(ctx, "foobar")
@@ -60,7 +60,7 @@ func TestBeginSubsegment(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()
 
-	ctx, td := NewTestDaemon()
+	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
 	ctx, root := BeginSegment(ctx, "root")
@@ -97,7 +97,7 @@ func TestAddError(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()
 
-	ctx, td := NewTestDaemon()
+	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
 	ctx, seg := BeginSegment(ctx, "foobar")

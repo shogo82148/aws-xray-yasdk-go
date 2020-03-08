@@ -6,21 +6,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"sync"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
+// TestDaemon is the mock server of AWS X-Ray daemon.
 type TestDaemon struct {
 	ch        <-chan *result
 	conn      net.PacketConn
 	ctx       context.Context
 	cancel    context.CancelFunc
+	ts        *httptest.Server
 	closeOnce sync.Once
 }
 
-func NewTestDaemon() (context.Context, *TestDaemon) {
+// NewTestDaemon creates new TestDaemon
+func NewTestDaemon(handler http.Handler) (context.Context, *TestDaemon) {
 	c := make(chan *result, 200)
 	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
 	if err != nil {
@@ -35,8 +41,17 @@ func NewTestDaemon() (context.Context, *TestDaemon) {
 		ctx:    ctx,
 		cancel: cancel,
 	}
+	address := "udp:" + conn.LocalAddr().String()
+	if handler != nil {
+		d.ts = httptest.NewServer(handler)
+		u, err := url.Parse(d.ts.URL)
+		if err != nil {
+			panic(err)
+		}
+		address += " tcp:" + u.Host
+	}
 	ctx = context.WithValue(ctx, clientContextKey, New(&Config{
-		DaemonAddress: conn.LocalAddr().String(),
+		DaemonAddress: address,
 	}))
 
 	go d.run(c)
@@ -48,10 +63,14 @@ type result struct {
 	Error   error
 }
 
+// Close shutdowns the daemon.
 func (td *TestDaemon) Close() {
 	td.closeOnce.Do(func() {
 		td.cancel()
 		td.conn.Close()
+		if td.ts != nil {
+			td.ts.Close()
+		}
 	})
 }
 
@@ -90,6 +109,7 @@ func (td *TestDaemon) run(c chan *result) {
 	}
 }
 
+// Recv returns the received segment.
 func (td *TestDaemon) Recv() (*schema.Segment, error) {
 	ctx, cancel := context.WithTimeout(td.ctx, 500*time.Millisecond)
 	defer cancel()

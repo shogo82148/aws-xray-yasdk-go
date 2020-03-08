@@ -9,7 +9,7 @@ import (
 )
 
 func TestCapture(t *testing.T) {
-	ctx, td := NewTestDaemon()
+	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
 	ctx, seg := BeginSegment(ctx, "root")
