@@ -14,10 +14,11 @@ type Config struct {
 	// The format is "address:port" or "tcp:address:port udp:address:port".
 	DaemonAddress string
 
+	StreamingStrategy StreamingStrategy
+
 	// TODO: @shogo82148
 	// AWS_XRAY_TRACING_NAME
 	// AWS_XRAY_CONTEXT_MISSING
-	// AWS_XRAY_TRACING_NAME
 }
 
 type daemonEndpoints struct {

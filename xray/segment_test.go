@@ -4,7 +4,14 @@ import (
 	"errors"
 	"regexp"
 	"testing"
+	"time"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
+
+// mock time function
+func fixedTime() time.Time { return time.Date(2001, time.September, 9, 1, 46, 40, 0, time.UTC) }
 
 func TestNewTraceID(t *testing.T) {
 	id := NewTraceID()
@@ -23,6 +30,9 @@ func TestNewSegmentID(t *testing.T) {
 }
 
 func TestBeginSegment(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
 	ctx, td := NewTestDaemon()
 	defer td.Close()
 
@@ -30,16 +40,26 @@ func TestBeginSegment(t *testing.T) {
 	_ = ctx // do something using ctx
 	seg.Close()
 
-	s, err := td.Recv()
+	got, err := td.Recv()
 	if err != nil {
 		t.Error(err)
 	}
-	if s.Name != "foobar" {
-		t.Errorf("name: want %q, got %q", "foobar", s.Name)
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   seg.traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
 func TestBeginSubsegment(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
 	ctx, td := NewTestDaemon()
 	defer td.Close()
 
@@ -49,34 +69,34 @@ func TestBeginSubsegment(t *testing.T) {
 	seg.Close()
 	root.Close()
 
-	// we will receive Independent Subsegment
-	s, err := td.Recv()
+	got, err := td.Recv()
 	if err != nil {
 		t.Error(err)
 	}
-	if s.Name != "subsegment" {
-		t.Errorf("name: want %q, got %q", "subsegment", s.Name)
+	want := &schema.Segment{
+		Name:      "root",
+		ID:        root.id,
+		TraceID:   root.traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "subsegment",
+				ID:        seg.id,
+				StartTime: 1000000000,
+				EndTime:   1000000000,
+			},
+		},
 	}
-	if s.Type != "subsegment" {
-		t.Errorf("name: want %q, got %q", "subsegment", s.Type)
-	}
-	if s.ParentID != root.id {
-		t.Errorf("want parent id is %q, got %q", root.id, s.ParentID)
-	}
-	if s.TraceID != root.traceID {
-		t.Errorf("want trace id is %q, got %q", root.traceID, s.TraceID)
-	}
-
-	s, err = td.Recv()
-	if err != nil {
-		t.Error(err)
-	}
-	if s.Name != "root" {
-		t.Errorf("name: want %q, got %q", "root", s.Name)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
 
 func TestAddError(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
 	ctx, td := NewTestDaemon()
 	defer td.Close()
 
@@ -86,14 +106,29 @@ func TestAddError(t *testing.T) {
 	}
 	seg.Close()
 
-	s, err := td.Recv()
+	got, err := td.Recv()
 	if err != nil {
 		t.Error(err)
 	}
-	if !s.Fault {
-		t.Error("want fault is true, but not")
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   seg.traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		Fault:     true,
+		Cause: &schema.Cause{
+			WorkingDirectory: got.Cause.WorkingDirectory,
+			Exceptions: []schema.Exception{
+				{
+					ID:      got.Cause.Exceptions[0].ID,
+					Message: "some error",
+					Type:    "*errors.errorString",
+				},
+			},
+		},
 	}
-	if s.Cause.Exceptions[0].Message != "some error" {
-		t.Errorf("want %q, got %q", "some error", s.Cause.Exceptions[0].Message)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
