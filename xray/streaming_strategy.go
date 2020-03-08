@@ -87,3 +87,50 @@ func (s *streamingStrategyBatchAll) serializeSubsegment(startTime time.Time, sta
 
 	return ret
 }
+
+type streamingStrategyLimitSubsegment struct {
+	limit int
+}
+
+// NewStreamingStrategyLimitSubsegment returns a streaming strategy.
+func NewStreamingStrategyLimitSubsegment(limit int) StreamingStrategy {
+	if limit < 0 {
+		panic("xray: limit should not be negative")
+	}
+	return &streamingStrategyLimitSubsegment{
+		limit: limit,
+	}
+}
+
+func (s *streamingStrategyLimitSubsegment) StreamSegment(seg *Segment) []*schema.Segment {
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+
+	startTime := seg.startTime
+	startEpoch := float64(startTime.Unix()) + float64(startTime.Nanosecond())/1e9
+	ret := &schema.Segment{
+		Name:      seg.name,
+		ID:        seg.id,
+		TraceID:   seg.traceID,
+		StartTime: startEpoch,
+
+		Error:    seg.error,
+		Throttle: seg.throttle,
+		Fault:    seg.fault,
+		Cause:    seg.cause,
+	}
+
+	if seg.inProgress() {
+		ret.InProgress = true
+	} else {
+		// use monotonic clock instead of wall clock to get correct proccessing time.
+		// https://golang.org/pkg/time/#hdr-Monotonic_Clocks
+		ret.EndTime = startEpoch + seg.endTime.Sub(startTime).Seconds()
+	}
+
+	if seg.parent != nil {
+		ret.ParentID = seg.id
+	}
+
+	return []*schema.Segment{ret}
+}

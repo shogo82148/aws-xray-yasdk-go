@@ -96,3 +96,73 @@ func TestStreamingStrategyBatchAll(t *testing.T) {
 		t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestStreamingStrategyLimitSubsegment(t *testing.T) {
+	now := time.Date(2001, time.September, 9, 1, 46, 40, 0, time.UTC)
+	strategy := NewStreamingStrategyLimitSubsegment(0)
+
+	t.Run("root segment", func(t *testing.T) {
+		seg := &Segment{
+			name:      "root segment",
+			id:        "03babb4ba280be51",
+			traceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+			startTime: now,
+			endTime:   now.Add(time.Second),
+		}
+		seg.root = seg
+		got := strategy.StreamSegment(seg)
+		want := []*schema.Segment{
+			{
+				Name:      "root segment",
+				ID:        "03babb4ba280be51",
+				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+				StartTime: 1000000000,
+				EndTime:   1000000001,
+			},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
+		}
+	})
+
+	t.Run("has parent", func(t *testing.T) {
+		seg := &Segment{
+			name:      "root segment",
+			id:        "03babb4ba280be51",
+			traceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+			startTime: now,
+		}
+		seg.root = seg
+		child1 := &Segment{
+			parent:    seg,
+			root:      seg,
+			name:      "child1",
+			id:        "acc82ea453399569",
+			traceID:   seg.traceID,
+			startTime: now,
+			endTime:   now.Add(time.Second),
+		}
+		seg.subsegments = append(seg.subsegments, child1)
+
+		got := strategy.StreamSegment(child1)
+		want := []*schema.Segment{
+			{
+				Name:       "root segment",
+				ID:         "03babb4ba280be51",
+				TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+				StartTime:  1000000000,
+				InProgress: true,
+			},
+			{
+				Name:      "child1",
+				ID:        "acc82ea453399569",
+				TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+				StartTime: 1000000000,
+				EndTime:   1000000001,
+			},
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("StreamSegment(seg) mismatch (-want +got):\n%s", diff)
+		}
+	})
+}
