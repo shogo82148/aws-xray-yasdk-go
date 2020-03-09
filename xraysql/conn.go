@@ -13,6 +13,7 @@ import (
 type driverConn struct {
 	driver.Conn
 	attr *dbAttribute
+	tx   *driverTx
 }
 
 func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
@@ -68,31 +69,59 @@ func (conn *driverConn) Begin() (driver.Tx, error) {
 }
 
 func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
+	ctx, seg := xray.BeginSubsegment(ctx, "transaction")
+	seg.AddMetadata("tx_options", map[string]interface{}{
+		"isolation_level": sql.IsolationLevel(opts.Isolation).String(),
+		"read_only":       opts.ReadOnly,
+	})
+
 	var tx driver.Tx
-	var err error
-	if connCtx, ok := conn.Conn.(driver.ConnBeginTx); ok {
-		tx, err = connCtx.BeginTx(ctx, opts)
-	} else {
-		if opts.Isolation != driver.IsolationLevel(sql.LevelDefault) {
-			return nil, errors.New("xraysql: driver does not support non-default isolation level")
-		}
-		if opts.ReadOnly {
-			return nil, errors.New("xraysql: driver does not support read-only transactions")
-		}
-		tx, err = conn.Conn.Begin()
-		if err == nil {
-			select {
-			default:
-			case <-ctx.Done():
-				tx.Rollback()
-				return nil, ctx.Err()
+	err := xray.Capture(ctx, conn.attr.name, func(ctx context.Context) error {
+		var err error
+		conn.attr.populate(ctx, "BEGIN")
+		if connCtx, ok := conn.Conn.(driver.ConnBeginTx); ok {
+			tx, err = connCtx.BeginTx(ctx, opts)
+		} else {
+			if opts.Isolation != driver.IsolationLevel(sql.LevelDefault) {
+				return errors.New("xraysql: driver does not support non-default isolation level")
+			}
+			if opts.ReadOnly {
+				return errors.New("xraysql: driver does not support read-only transactions")
+			}
+			tx, err = conn.Conn.Begin()
+			if err == nil {
+				select {
+				default:
+				case <-ctx.Done():
+					tx.Rollback()
+					return ctx.Err()
+				}
 			}
 		}
-	}
+		return err
+	})
 	if err != nil {
+		seg.Close()
 		return nil, err
 	}
-	return &driverTx{Tx: tx}, nil
+	tx1 := &driverTx{
+		Tx:   tx,
+		ctx:  ctx,
+		seg:  seg,
+		conn: conn,
+	}
+	conn.tx = tx1
+	return tx1, nil
+}
+
+// util function for handling a transaction segment.
+func (conn *driverConn) beginSubsegment(ctx context.Context) (context.Context, *xray.Segment) {
+	parent := ctx
+	if conn.tx != nil {
+		parent = conn.tx.ctx
+	}
+	_, seg := xray.BeginSubsegment(parent, conn.attr.name)
+	return xray.WithSegment(ctx, seg), seg
 }
 
 func (conn *driverConn) Exec(query string, args []driver.Value) (driver.Result, error) {
@@ -105,7 +134,7 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 		return nil, driver.ErrSkip
 	}
 
-	ctx, seg := xray.BeginSubsegment(ctx, conn.attr.name)
+	ctx, seg := conn.beginSubsegment(ctx)
 	defer seg.Close()
 	defer func() {
 		if err := recover(); err != nil {
@@ -153,7 +182,7 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 		return nil, driver.ErrSkip
 	}
 
-	ctx, seg := xray.BeginSubsegment(ctx, conn.attr.name)
+	ctx, seg := conn.beginSubsegment(ctx)
 	defer seg.Close()
 	defer func() {
 		if err := recover(); err != nil {

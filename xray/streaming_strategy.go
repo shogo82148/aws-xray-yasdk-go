@@ -39,6 +39,7 @@ func serialize(seg *Segment) *schema.Segment {
 		Cause:    seg.cause,
 
 		Namespace: seg.namespace,
+		Metadata:  seg.metadata,
 		SQL:       seg.sql,
 	}
 
@@ -94,6 +95,7 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 		Cause:    seg.cause,
 
 		Namespace: seg.namespace,
+		Metadata:  seg.metadata,
 		SQL:       seg.sql,
 	}
 

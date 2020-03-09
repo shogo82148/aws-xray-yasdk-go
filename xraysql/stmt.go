@@ -14,6 +14,16 @@ type driverStmt struct {
 	query string
 }
 
+// util function for handling a transaction segment.
+func (stmt *driverStmt) beginSubsegment(ctx context.Context) (context.Context, *xray.Segment) {
+	parent := ctx
+	if stmt.conn.tx != nil {
+		parent = stmt.conn.tx.ctx
+	}
+	_, seg := xray.BeginSubsegment(parent, stmt.conn.attr.name)
+	return xray.WithSegment(ctx, seg), seg
+}
+
 func (stmt *driverStmt) Close() error {
 	return stmt.Stmt.Close()
 }
@@ -28,25 +38,28 @@ func (stmt *driverStmt) Exec(args []driver.Value) (driver.Result, error) {
 
 func (stmt *driverStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	var result driver.Result
-	err := xray.Capture(ctx, stmt.conn.attr.name, func(ctx context.Context) error {
-		stmt.conn.attr.populate(ctx, stmt.query)
-		var err error
-		if execerContext, ok := stmt.Stmt.(driver.StmtExecContext); ok {
-			result, err = execerContext.ExecContext(ctx, args)
-		} else {
-			select {
-			default:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			dargs, err0 := namedValuesToValues(args)
-			if err0 != nil {
-				return err0
-			}
-			result, err = stmt.Stmt.Exec(dargs)
+	ctx, seg := stmt.beginSubsegment(ctx)
+	defer seg.Close()
+	stmt.conn.attr.populate(ctx, stmt.query)
+	var err error
+	if execerContext, ok := stmt.Stmt.(driver.StmtExecContext); ok {
+		result, err = execerContext.ExecContext(ctx, args)
+	} else {
+		select {
+		default:
+		case <-ctx.Done():
+			err := ctx.Err()
+			seg.AddError(err)
+			return nil, err
 		}
-		return err
-	})
+		dargs, err0 := namedValuesToValues(args)
+		if err0 != nil {
+			seg.AddError(err0)
+			return nil, err0
+		}
+		result, err = stmt.Stmt.Exec(dargs)
+	}
+	seg.AddError(err)
 	return result, err
 }
 
@@ -56,25 +69,28 @@ func (stmt *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 func (stmt *driverStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	var result driver.Rows
-	err := xray.Capture(ctx, stmt.conn.attr.name, func(ctx context.Context) error {
-		stmt.conn.attr.populate(ctx, stmt.query)
-		var err error
-		if queryCtx, ok := stmt.Stmt.(driver.StmtQueryContext); ok {
-			result, err = queryCtx.QueryContext(ctx, args)
-		} else {
-			select {
-			default:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			dargs, err0 := namedValuesToValues(args)
-			if err0 != nil {
-				return err0
-			}
-			result, err = stmt.Stmt.Query(dargs)
+	ctx, seg := stmt.beginSubsegment(ctx)
+	defer seg.Close()
+	stmt.conn.attr.populate(ctx, stmt.query)
+	var err error
+	if queryCtx, ok := stmt.Stmt.(driver.StmtQueryContext); ok {
+		result, err = queryCtx.QueryContext(ctx, args)
+	} else {
+		select {
+		default:
+		case <-ctx.Done():
+			err := ctx.Err()
+			seg.AddError(err)
+			return nil, err
 		}
-		return err
-	})
+		dargs, err0 := namedValuesToValues(args)
+		if err0 != nil {
+			seg.AddError(err0)
+			return nil, err0
+		}
+		result, err = stmt.Stmt.Query(dargs)
+	}
+	seg.AddError(err)
 	return result, err
 }
 
