@@ -68,6 +68,7 @@ type Segment struct {
 	cause    *schema.Cause
 
 	namespace string
+	sql       *schema.SQL
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -229,4 +230,19 @@ func (seg *Segment) SetNamespace(namespace string) {
 	seg.mu.Lock()
 	defer seg.mu.Unlock()
 	seg.namespace = namespace
+}
+
+// SetSQL sets the information of SQL queries.
+func (seg *Segment) SetSQL(sql *schema.SQL) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.sql = sql
+}
+
+// SetSQL sets the information of SQL queries.
+func SetSQL(ctx context.Context, sql *schema.SQL) {
+	ContextSegment(ctx).SetSQL(sql)
 }

@@ -28,7 +28,8 @@ func (stmt *driverStmt) Exec(args []driver.Value) (driver.Result, error) {
 
 func (stmt *driverStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	var result driver.Result
-	err := xray.Capture(ctx, "TODO ExecContext", func(ctx context.Context) error {
+	err := xray.Capture(ctx, stmt.conn.attr.name, func(ctx context.Context) error {
+		stmt.conn.attr.populate(ctx, stmt.query)
 		var err error
 		if execerContext, ok := stmt.Stmt.(driver.StmtExecContext); ok {
 			result, err = execerContext.ExecContext(ctx, args)
@@ -55,7 +56,8 @@ func (stmt *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 func (stmt *driverStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	var result driver.Rows
-	err := xray.Capture(ctx, "TODO QueryContext", func(ctx context.Context) error {
+	err := xray.Capture(ctx, stmt.conn.attr.name, func(ctx context.Context) error {
+		stmt.conn.attr.populate(ctx, stmt.query)
 		var err error
 		if queryCtx, ok := stmt.Stmt.(driver.StmtQueryContext); ok {
 			result, err = queryCtx.QueryContext(ctx, args)

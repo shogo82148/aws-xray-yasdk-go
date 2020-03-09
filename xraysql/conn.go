@@ -12,6 +12,7 @@ import (
 
 type driverConn struct {
 	driver.Conn
+	attr *dbAttribute
 }
 
 func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
@@ -23,7 +24,8 @@ func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
 }
 
 func (conn *driverConn) Ping(ctx context.Context) error {
-	return xray.Capture(ctx, "TODO Ping", func(ctx context.Context) error {
+	return xray.Capture(ctx, conn.attr.name, func(ctx context.Context) error {
+		conn.attr.populate(ctx, "PING")
 		if p, ok := conn.Conn.(driver.Pinger); ok {
 			return p.Ping(ctx)
 		}
@@ -103,7 +105,7 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 		return nil, driver.ErrSkip
 	}
 
-	ctx, seg := xray.BeginSubsegment(ctx, "TODO ExecContext")
+	ctx, seg := xray.BeginSubsegment(ctx, conn.attr.name)
 	defer seg.Close()
 	defer func() {
 		if err := recover(); err != nil {
@@ -133,12 +135,12 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 	}
 
 	if err == driver.ErrSkip {
+		conn.attr.populate(ctx, query+msgErrSkip)
 		return nil, driver.ErrSkip
-	} else if err != nil {
-		seg.AddError(err)
-		return nil, err
 	}
-	return result, nil
+	conn.attr.populate(ctx, query)
+	seg.AddError(err)
+	return result, err
 }
 
 func (conn *driverConn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -151,7 +153,7 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 		return nil, driver.ErrSkip
 	}
 
-	ctx, seg := xray.BeginSubsegment(ctx, "TODO QueryContext")
+	ctx, seg := xray.BeginSubsegment(ctx, conn.attr.name)
 	defer seg.Close()
 	defer func() {
 		if err := recover(); err != nil {
@@ -181,11 +183,11 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 	}
 
 	if err == driver.ErrSkip {
+		conn.attr.populate(ctx, query+msgErrSkip)
 		return nil, driver.ErrSkip
-	} else if err != nil {
-		seg.AddError(err)
-		return nil, err
 	}
+	conn.attr.populate(ctx, query)
+	seg.AddError(err)
 	return rows, nil
 }
 

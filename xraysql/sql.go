@@ -66,8 +66,9 @@ func registerDriver(driverName, dataSourceName string, opts ...Option) (string, 
 		opt(&cfg)
 	}
 	d := &driverDriver{
-		Driver: db.Driver(),
-		config: cfg,
+		Driver:   db.Driver(),
+		config:   cfg,
+		baseName: driverName,
 	}
 
 	// register the driver with the individual name
@@ -83,5 +84,6 @@ func OpenDB(c driver.Connector, opts ...Option) *sql.DB {
 
 type driverDriver struct {
 	driver.Driver
-	config config
+	config   config
+	baseName string
 }
