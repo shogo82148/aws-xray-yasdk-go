@@ -2,15 +2,33 @@ package xraysql
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
+	"errors"
+	"fmt"
+
+	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
 
 type driverConn struct {
 	driver.Conn
 }
 
+func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
+	c, err := d.OpenConnector(dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+	return c.Connect(context.Background())
+}
+
 func (conn *driverConn) Ping(ctx context.Context) error {
-	return nil
+	return xray.Capture(ctx, "TODO Ping", func(ctx context.Context) error {
+		if p, ok := conn.Conn.(driver.Pinger); ok {
+			return p.Ping(ctx)
+		}
+		return nil
+	})
 }
 
 func (conn *driverConn) Prepare(query string) (driver.Stmt, error) {
@@ -18,7 +36,29 @@ func (conn *driverConn) Prepare(query string) (driver.Stmt, error) {
 }
 
 func (conn *driverConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	return nil, nil
+	var stmt driver.Stmt
+	var err error
+	if connCtx, ok := conn.Conn.(driver.ConnPrepareContext); ok {
+		stmt, err = connCtx.PrepareContext(ctx, query)
+	} else {
+		stmt, err = conn.Conn.Prepare(query)
+		if err == nil {
+			select {
+			default:
+			case <-ctx.Done():
+				stmt.Close()
+				return nil, ctx.Err()
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &driverStmt{
+		Stmt:  stmt,
+		query: query,
+		conn:  conn,
+	}, nil
 }
 
 func (conn *driverConn) Begin() (driver.Tx, error) {
@@ -26,7 +66,31 @@ func (conn *driverConn) Begin() (driver.Tx, error) {
 }
 
 func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	return nil, nil
+	var tx driver.Tx
+	var err error
+	if connCtx, ok := conn.Conn.(driver.ConnBeginTx); ok {
+		tx, err = connCtx.BeginTx(ctx, opts)
+	} else {
+		if opts.Isolation != driver.IsolationLevel(sql.LevelDefault) {
+			return nil, errors.New("xraysql: driver does not support non-default isolation level")
+		}
+		if opts.ReadOnly {
+			return nil, errors.New("xraysql: driver does not support read-only transactions")
+		}
+		tx, err = conn.Conn.Begin()
+		if err == nil {
+			select {
+			default:
+			case <-ctx.Done():
+				tx.Rollback()
+				return nil, ctx.Err()
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &driverTx{Tx: tx}, nil
 }
 
 func (conn *driverConn) Exec(query string, args []driver.Value) (driver.Result, error) {
@@ -34,7 +98,47 @@ func (conn *driverConn) Exec(query string, args []driver.Value) (driver.Result, 
 }
 
 func (conn *driverConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	return nil, nil
+	execer, ok := conn.Conn.(driver.Execer)
+	if !ok {
+		return nil, driver.ErrSkip
+	}
+
+	ctx, seg := xray.BeginSubsegment(ctx, "TODO ExecContext")
+	defer seg.Close()
+	defer func() {
+		if err := recover(); err != nil {
+			seg.AddError(fmt.Errorf("panic: %v", err))
+			panic(err)
+		}
+	}()
+
+	var err error
+	var result driver.Result
+	if execerCtx, ok := conn.Conn.(driver.ExecerContext); ok {
+		result, err = execerCtx.ExecContext(ctx, query, args)
+	} else {
+		select {
+		default:
+		case <-ctx.Done():
+			err := ctx.Err()
+			seg.AddError(err)
+			return nil, err
+		}
+		dargs, err0 := namedValuesToValues(args)
+		if err0 != nil {
+			seg.AddError(err0)
+			return nil, err0
+		}
+		result, err = execer.Exec(query, dargs)
+	}
+
+	if err == driver.ErrSkip {
+		return nil, driver.ErrSkip
+	} else if err != nil {
+		seg.AddError(err)
+		return nil, err
+	}
+	return result, nil
 }
 
 func (conn *driverConn) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -42,7 +146,47 @@ func (conn *driverConn) Query(query string, args []driver.Value) (driver.Rows, e
 }
 
 func (conn *driverConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	return nil, nil
+	queryer, ok := conn.Conn.(driver.Queryer)
+	if !ok {
+		return nil, driver.ErrSkip
+	}
+
+	ctx, seg := xray.BeginSubsegment(ctx, "TODO QueryContext")
+	defer seg.Close()
+	defer func() {
+		if err := recover(); err != nil {
+			seg.AddError(fmt.Errorf("panic: %v", err))
+			panic(err)
+		}
+	}()
+
+	var err error
+	var rows driver.Rows
+	if queryerCtx, ok := conn.Conn.(driver.QueryerContext); ok {
+		rows, err = queryerCtx.QueryContext(ctx, query, args)
+	} else {
+		select {
+		default:
+		case <-ctx.Done():
+			err := ctx.Err()
+			seg.AddError(err)
+			return nil, err
+		}
+		dargs, err0 := namedValuesToValues(args)
+		if err0 != nil {
+			seg.AddError(err0)
+			return nil, err0
+		}
+		rows, err = queryer.Query(query, dargs)
+	}
+
+	if err == driver.ErrSkip {
+		return nil, driver.ErrSkip
+	} else if err != nil {
+		seg.AddError(err)
+		return nil, err
+	}
+	return rows, nil
 }
 
 func (conn *driverConn) Close() error {

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
+
+	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
 
 type driverStmt struct {
@@ -25,7 +27,26 @@ func (stmt *driverStmt) Exec(args []driver.Value) (driver.Result, error) {
 }
 
 func (stmt *driverStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	return nil, nil
+	var result driver.Result
+	err := xray.Capture(ctx, "TODO ExecContext", func(ctx context.Context) error {
+		var err error
+		if execerContext, ok := stmt.Stmt.(driver.StmtExecContext); ok {
+			result, err = execerContext.ExecContext(ctx, args)
+		} else {
+			select {
+			default:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			dargs, err0 := namedValuesToValues(args)
+			if err0 != nil {
+				return err0
+			}
+			result, err = stmt.Stmt.Exec(dargs)
+		}
+		return err
+	})
+	return result, err
 }
 
 func (stmt *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
@@ -33,7 +54,26 @@ func (stmt *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (stmt *driverStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	return nil, nil
+	var result driver.Rows
+	err := xray.Capture(ctx, "TODO QueryContext", func(ctx context.Context) error {
+		var err error
+		if queryCtx, ok := stmt.Stmt.(driver.StmtQueryContext); ok {
+			result, err = queryCtx.QueryContext(ctx, args)
+		} else {
+			select {
+			default:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			dargs, err0 := namedValuesToValues(args)
+			if err0 != nil {
+				return err0
+			}
+			result, err = stmt.Stmt.Query(dargs)
+		}
+		return err
+	})
+	return result, err
 }
 
 func (stmt *driverStmt) ColumnConverter(idx int) driver.ValueConverter {
@@ -64,7 +104,7 @@ func namedValuesToValues(args []driver.NamedValue) ([]driver.Value, error) {
 	ret := make([]driver.Value, len(args))
 	for _, arg := range args {
 		if len(arg.Name) > 0 {
-			err = errors.New("xray: driver does not support the use of Named Parameters")
+			err = errors.New("xraysql: driver does not support the use of Named Parameters")
 		}
 		ret[arg.Ordinal-1] = arg.Value
 	}
