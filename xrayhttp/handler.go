@@ -50,6 +50,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		XForwardedFor: forwarded,
 		UserAgent:     r.UserAgent(),
 	}
+	seg.SetHTTPRequest(requestInfo)
 
 	rw := &responseTracer{rw: w}
 	tracer.h.ServeHTTP(rw, r)
@@ -58,10 +59,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Status:        rw.status,
 		ContentLength: rw.size,
 	}
-	seg.SetHTTP(&schema.HTTP{
-		Request:  requestInfo,
-		Response: responseInfo,
-	})
+	seg.SetHTTPResponse(responseInfo)
 	if rw.status >= 400 && rw.status < 500 {
 		seg.SetError()
 	}

@@ -354,11 +354,38 @@ func SetSQL(ctx context.Context, sql *schema.SQL) {
 	ContextSegment(ctx).SetSQL(sql)
 }
 
-func (seg *Segment) SetHTTP(http *schema.HTTP) {
+// SetHTTPRequest sets the information of HTTP requests.
+func (seg *Segment) SetHTTPRequest(request *schema.HTTPRequest) {
 	if seg == nil {
 		return
 	}
 	seg.mu.Lock()
 	defer seg.mu.Unlock()
-	seg.http = http
+	if seg.http == nil {
+		seg.http = &schema.HTTP{}
+	}
+	seg.http.Request = request
+}
+
+// SetHTTPRequest sets the information of HTTP requests.
+func SetHTTPRequest(ctx context.Context, request *schema.HTTPRequest) {
+	ContextSegment(ctx).SetHTTPRequest(request)
+}
+
+// SetHTTPResponse sets the information of HTTP requests.
+func (seg *Segment) SetHTTPResponse(response *schema.HTTPResponse) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	if seg.http == nil {
+		seg.http = &schema.HTTP{}
+	}
+	seg.http.Response = response
+}
+
+// SetHTTPResponse sets the information of HTTP requests.
+func SetHTTPResponse(ctx context.Context, response *schema.HTTPResponse) {
+	ContextSegment(ctx).SetHTTPResponse(response)
 }
