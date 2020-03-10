@@ -41,6 +41,7 @@ func serialize(seg *Segment) *schema.Segment {
 		Namespace: seg.namespace,
 		Metadata:  seg.metadata,
 		SQL:       seg.sql,
+		HTTP:      seg.http,
 	}
 
 	if seg.inProgress() {
@@ -97,6 +98,7 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 		Namespace: seg.namespace,
 		Metadata:  seg.metadata,
 		SQL:       seg.sql,
+		HTTP:      seg.http,
 	}
 
 	if seg.inProgress() {

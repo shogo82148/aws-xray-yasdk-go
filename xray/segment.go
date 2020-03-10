@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -70,6 +71,7 @@ type Segment struct {
 	namespace string
 	metadata  map[string]interface{}
 	sql       *schema.SQL
+	http      *schema.HTTP
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -112,6 +114,28 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 		name:          name, // TODO: @shogo82148 sanitize the name
 		id:            NewSegmentID(),
 		traceID:       NewTraceID(),
+		startTime:     now,
+		totalSegments: 1,
+	}
+	seg.root = seg
+	ctx = context.WithValue(ctx, segmentContextKey, seg)
+	return ctx, seg
+}
+
+// NewSegmentFromHeader creates a segment for downstream call and add information to the segment that gets from HTTP header.
+func NewSegmentFromHeader(ctx context.Context, name string, r *http.Request, h TraceHeader) (context.Context, *Segment) {
+	// TODO: set ParentID
+	// TODO: sampling
+	traceID := h.TraceID
+	if traceID == "" {
+		traceID = NewTraceID()
+	}
+	now := nowFunc()
+	seg := &Segment{
+		ctx:           ctx,
+		name:          name, // TODO: @shogo82148 sanitize the name
+		id:            NewSegmentID(),
+		traceID:       traceID,
 		startTime:     now,
 		totalSegments: 1,
 	}
@@ -218,6 +242,9 @@ func newExceptionID() string {
 
 // AddError sets error.
 func (seg *Segment) AddError(err error) bool {
+	if seg == nil {
+		return err != nil
+	}
 	if err == nil {
 		return false
 	}
@@ -239,11 +266,52 @@ func (seg *Segment) AddError(err error) bool {
 
 // AddError sets the segment of the current context an error.
 func AddError(ctx context.Context, err error) bool {
-	seg := ContextSegment(ctx)
+	return ContextSegment(ctx).AddError(err)
+}
+
+// SetError sets error flag.
+func (seg *Segment) SetError() {
 	if seg == nil {
-		return err != nil
+		return
 	}
-	return seg.AddError(err)
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.error = true
+}
+
+// SetError sets error flag.
+func SetError(ctx context.Context) {
+	ContextSegment(ctx).SetError()
+}
+
+// SetThrottle sets throttle flag.
+func (seg *Segment) SetThrottle() {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.throttle = true
+}
+
+// SetThrottle sets error flag.
+func SetThrottle(ctx context.Context) {
+	ContextSegment(ctx).SetThrottle()
+}
+
+// SetFault sets fault flag.
+func (seg *Segment) SetFault() {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.fault = true
+}
+
+// SetFault sets fault flag.
+func SetFault(ctx context.Context) {
+	ContextSegment(ctx).SetFault()
 }
 
 // SetNamespace sets namespace
@@ -284,4 +352,40 @@ func (seg *Segment) SetSQL(sql *schema.SQL) {
 // SetSQL sets the information of SQL queries.
 func SetSQL(ctx context.Context, sql *schema.SQL) {
 	ContextSegment(ctx).SetSQL(sql)
+}
+
+// SetHTTPRequest sets the information of HTTP requests.
+func (seg *Segment) SetHTTPRequest(request *schema.HTTPRequest) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	if seg.http == nil {
+		seg.http = &schema.HTTP{}
+	}
+	seg.http.Request = request
+}
+
+// SetHTTPRequest sets the information of HTTP requests.
+func SetHTTPRequest(ctx context.Context, request *schema.HTTPRequest) {
+	ContextSegment(ctx).SetHTTPRequest(request)
+}
+
+// SetHTTPResponse sets the information of HTTP requests.
+func (seg *Segment) SetHTTPResponse(response *schema.HTTPResponse) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	if seg.http == nil {
+		seg.http = &schema.HTTP{}
+	}
+	seg.http.Response = response
+}
+
+// SetHTTPResponse sets the information of HTTP requests.
+func SetHTTPResponse(ctx context.Context, response *schema.HTTPResponse) {
+	ContextSegment(ctx).SetHTTPResponse(response)
 }
