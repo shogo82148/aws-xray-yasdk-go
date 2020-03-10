@@ -93,6 +93,58 @@ func TestBeginSubsegment(t *testing.T) {
 	}
 }
 
+func TestSegmentPanic(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	errPanic := errors.New("PANIC")
+	var id, traceID string
+	func() {
+		defer func() {
+			err := recover()
+			if err != errPanic {
+				t.Errorf("want %v, got %v", errPanic, err)
+			}
+		}()
+		func() {
+			_, seg := BeginSegment(ctx, "foobar")
+			defer seg.Close()
+			id = seg.id
+			traceID = seg.traceID
+			panic(errPanic)
+		}()
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        id,
+		TraceID:   traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		Fault:     true,
+		Cause: &schema.Cause{
+			WorkingDirectory: got.Cause.WorkingDirectory,
+			Exceptions: []schema.Exception{
+				{
+					ID:      got.Cause.Exceptions[0].ID,
+					Message: "*errors.errorString: PANIC",
+					Type:    "*xray.errorPanic",
+				},
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestAddError(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()

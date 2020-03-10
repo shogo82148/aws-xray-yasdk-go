@@ -153,6 +153,14 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	return ctx, seg
 }
 
+type errorPanic struct {
+	err interface{}
+}
+
+func (err *errorPanic) Error() string {
+	return fmt.Sprintf("%T: %v", err.err, err.err)
+}
+
 // Close closes the segment.
 func (seg *Segment) Close() {
 	if seg.parent != nil {
@@ -160,8 +168,15 @@ func (seg *Segment) Close() {
 	} else {
 		Debugf(seg.ctx, "Closing segment named %s", seg.name)
 	}
+	err := recover()
+	if err != nil {
+		seg.AddError(&errorPanic{err: err})
+	}
 	seg.close()
 	seg.emit()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (seg *Segment) close() {

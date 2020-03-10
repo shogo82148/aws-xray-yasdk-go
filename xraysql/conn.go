@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"errors"
-	"fmt"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
@@ -136,12 +135,6 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 
 	ctx, seg := conn.beginSubsegment(ctx)
 	defer seg.Close()
-	defer func() {
-		if err := recover(); err != nil {
-			seg.AddError(fmt.Errorf("panic: %v", err))
-			panic(err)
-		}
-	}()
 
 	var err error
 	var result driver.Result
@@ -184,12 +177,6 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 
 	ctx, seg := conn.beginSubsegment(ctx)
 	defer seg.Close()
-	defer func() {
-		if err := recover(); err != nil {
-			seg.AddError(fmt.Errorf("panic: %v", err))
-			panic(err)
-		}
-	}()
 
 	var err error
 	var rows driver.Rows
