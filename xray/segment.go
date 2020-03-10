@@ -71,6 +71,7 @@ type Segment struct {
 	namespace string
 	metadata  map[string]interface{}
 	sql       *schema.SQL
+	http      *schema.HTTP
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -307,4 +308,13 @@ func (seg *Segment) SetSQL(sql *schema.SQL) {
 // SetSQL sets the information of SQL queries.
 func SetSQL(ctx context.Context, sql *schema.SQL) {
 	ContextSegment(ctx).SetSQL(sql)
+}
+
+func (seg *Segment) SetHTTP(http *schema.HTTP) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.http = http
 }

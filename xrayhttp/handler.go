@@ -1,9 +1,12 @@
 package xrayhttp
 
 import (
+	"net"
 	"net/http"
+	"strings"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 // TracingNamer is the interface for naming service node.
@@ -38,5 +41,45 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, seg := xray.NewSegmentFromHeader(r.Context(), name, r, header)
 	defer seg.Close()
 	r = r.WithContext(ctx)
+
+	ip, forwarded := clientIP(r)
+	requestInfo := &schema.HTTPRequest{
+		Method:        r.Method,
+		URL:           getURL(r),
+		ClientIP:      ip,
+		XForwardedFor: forwarded,
+		UserAgent:     r.UserAgent(),
+	}
+	seg.SetHTTP(&schema.HTTP{
+		Request: requestInfo,
+	})
+
 	tracer.h.ServeHTTP(w, r)
+}
+
+func getURL(r *http.Request) string {
+	proto := r.Header.Get("X-Forwarded-Proto")
+	if proto == "" {
+		if r.TLS != nil {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+	return proto + "://" + r.Host + r.URL.Path
+}
+
+func clientIP(r *http.Request) (string, bool) {
+	forwardedFor := r.Header.Get("X-Forwarded-For")
+	if forwardedFor != "" {
+		if idx := strings.IndexByte(forwardedFor, ','); idx > 0 {
+			forwardedFor = forwardedFor[:idx]
+		}
+		return strings.TrimSpace(forwardedFor), true
+	}
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr, false
+	}
+	return ip, false
 }
