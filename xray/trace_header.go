@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// TraceIDHeaderKey is the HTTP header name used for tracing.
+const TraceIDHeaderKey string = "x-amzn-trace-id"
+
 // SamplingDecision is whether or not the current segment has been sampled.
 type SamplingDecision rune
 

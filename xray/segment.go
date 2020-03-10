@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -112,6 +113,24 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 		name:          name, // TODO: @shogo82148 sanitize the name
 		id:            NewSegmentID(),
 		traceID:       NewTraceID(),
+		startTime:     now,
+		totalSegments: 1,
+	}
+	seg.root = seg
+	ctx = context.WithValue(ctx, segmentContextKey, seg)
+	return ctx, seg
+}
+
+// NewSegmentFromHeader creates a segment for downstream call and add information to the segment that gets from HTTP header.
+func NewSegmentFromHeader(ctx context.Context, name string, r *http.Request, h TraceHeader) (context.Context, *Segment) {
+	// TODO: set ParentID
+	// TODO: sampling
+	now := nowFunc()
+	seg := &Segment{
+		ctx:           ctx,
+		name:          name, // TODO: @shogo82148 sanitize the name
+		id:            NewSegmentID(),
+		traceID:       h.TraceID,
 		startTime:     now,
 		totalSegments: 1,
 	}
