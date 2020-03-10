@@ -242,6 +242,9 @@ func newExceptionID() string {
 
 // AddError sets error.
 func (seg *Segment) AddError(err error) bool {
+	if seg == nil {
+		return err != nil
+	}
 	if err == nil {
 		return false
 	}
@@ -263,11 +266,52 @@ func (seg *Segment) AddError(err error) bool {
 
 // AddError sets the segment of the current context an error.
 func AddError(ctx context.Context, err error) bool {
-	seg := ContextSegment(ctx)
+	return ContextSegment(ctx).AddError(err)
+}
+
+// SetError sets error flag.
+func (seg *Segment) SetError() {
 	if seg == nil {
-		return err != nil
+		return
 	}
-	return seg.AddError(err)
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.error = true
+}
+
+// SetError sets error flag.
+func SetError(ctx context.Context) {
+	ContextSegment(ctx).SetError()
+}
+
+// SetThrottle sets throttle flag.
+func (seg *Segment) SetThrottle() {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.throttle = true
+}
+
+// SetThrottle sets error flag.
+func SetThrottle(ctx context.Context) {
+	ContextSegment(ctx).SetThrottle()
+}
+
+// SetFault sets fault flag.
+func (seg *Segment) SetFault() {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	seg.fault = true
+}
+
+// SetFault sets fault flag.
+func SetFault(ctx context.Context) {
+	ContextSegment(ctx).SetFault()
 }
 
 // SetNamespace sets namespace

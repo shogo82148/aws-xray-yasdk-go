@@ -50,11 +50,27 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		XForwardedFor: forwarded,
 		UserAgent:     r.UserAgent(),
 	}
-	seg.SetHTTP(&schema.HTTP{
-		Request: requestInfo,
-	})
 
-	tracer.h.ServeHTTP(w, r)
+	rw := &responseTracer{rw: w}
+	tracer.h.ServeHTTP(rw, r)
+
+	responseInfo := &schema.HTTPResponse{
+		Status:        rw.status,
+		ContentLength: rw.size,
+	}
+	seg.SetHTTP(&schema.HTTP{
+		Request:  requestInfo,
+		Response: responseInfo,
+	})
+	if rw.status >= 400 && rw.status < 500 {
+		seg.SetError()
+	}
+	if rw.status == http.StatusTooManyRequests {
+		seg.SetThrottle()
+	}
+	if rw.status >= 500 && rw.status < 600 {
+		seg.SetFault()
+	}
 }
 
 func getURL(r *http.Request) string {
@@ -82,4 +98,28 @@ func clientIP(r *http.Request) (string, bool) {
 		return r.RemoteAddr, false
 	}
 	return ip, false
+}
+
+type responseTracer struct {
+	rw     http.ResponseWriter
+	status int
+	size   int
+}
+
+func (rw *responseTracer) Header() http.Header {
+	return rw.rw.Header()
+}
+
+func (rw *responseTracer) Write(b []byte) (int, error) {
+	if rw.status == 0 {
+		rw.WriteHeader(http.StatusOK)
+	}
+	size, err := rw.rw.Write(b)
+	rw.size += size
+	return size, err
+}
+
+func (rw *responseTracer) WriteHeader(s int) {
+	rw.rw.WriteHeader(s)
+	rw.status = s
 }
