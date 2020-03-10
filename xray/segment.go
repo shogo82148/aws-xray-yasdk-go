@@ -125,12 +125,16 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 func NewSegmentFromHeader(ctx context.Context, name string, r *http.Request, h TraceHeader) (context.Context, *Segment) {
 	// TODO: set ParentID
 	// TODO: sampling
+	traceID := h.TraceID
+	if traceID == "" {
+		traceID = NewTraceID()
+	}
 	now := nowFunc()
 	seg := &Segment{
 		ctx:           ctx,
 		name:          name, // TODO: @shogo82148 sanitize the name
 		id:            NewSegmentID(),
-		traceID:       h.TraceID,
+		traceID:       traceID,
 		startTime:     now,
 		totalSegments: 1,
 	}
