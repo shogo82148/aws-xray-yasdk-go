@@ -1,7 +1,6 @@
 package xrayhttp
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptrace"
 
@@ -51,12 +50,6 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	ctx, seg := xray.BeginSubsegment(req.Context(), host)
 	defer seg.Close()
-	defer func() {
-		if err := recover(); err != nil {
-			seg.AddError(fmt.Errorf("panic: %v", err))
-			panic(err)
-		}
-	}()
 	if !isEmptyHost {
 		seg.SetNamespace("remote")
 	}
