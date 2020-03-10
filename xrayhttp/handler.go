@@ -16,7 +16,7 @@ type FixedTracingNamer string
 
 // TracingName implements TracingNamer.
 func (tn FixedTracingNamer) TracingName(r *http.Request) string {
-	return string(sn)
+	return string(tn)
 }
 
 type httpTracer struct {
