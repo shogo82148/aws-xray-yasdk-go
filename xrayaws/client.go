@@ -71,7 +71,7 @@ func (segs *subsegments) beforeSign(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 	segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
-	ctx := xrayhttp.WithClientTrace(r.HTTPRequest.Context())
+	ctx := xrayhttp.WithClientTrace(segs.attemptCtx)
 	r.HTTPRequest = r.HTTPRequest.WithContext(ctx)
 }
 
