@@ -123,14 +123,15 @@ type clientTrace struct {
 	httptrace *httptrace.ClientTrace
 }
 
-func newClientTrace(ctx context.Context) *clientTrace {
+// WithClientTrace returns a new context based on the provided parent ctx.
+func WithClientTrace(ctx context.Context) context.Context {
 	if ctx == nil {
 		panic("ctx must not be nil")
 	}
 	segs := &httpSubsegments{
 		ctx: ctx,
 	}
-	return &clientTrace{
+	trace := &clientTrace{
 		segments: segs,
 		httptrace: &httptrace.ClientTrace{
 			GetConn:              segs.GetConn,
@@ -151,4 +152,5 @@ func newClientTrace(ctx context.Context) *clientTrace {
 			WroteRequest:         segs.WroteRequest,
 		},
 	}
+	return httptrace.WithClientTrace(ctx, trace.httptrace)
 }

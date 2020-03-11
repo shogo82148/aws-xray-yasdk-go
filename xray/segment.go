@@ -177,6 +177,15 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	return ctx, seg
 }
 
+// Parent returns the parent segment.
+func (seg *Segment) Parent() *Segment {
+	if seg == nil {
+		return nil
+	}
+	// no need to lock because no one writes the parent after BeginSubsegment
+	return seg.parent
+}
+
 type errorPanic struct {
 	err interface{}
 }
@@ -316,9 +325,27 @@ func SetFault(ctx context.Context) {
 
 // SetNamespace sets namespace
 func (seg *Segment) SetNamespace(namespace string) {
+	if seg == nil {
+		return
+	}
 	seg.mu.Lock()
 	defer seg.mu.Unlock()
 	seg.namespace = namespace
+}
+
+// SetNamespace sets namespace
+func SetNamespace(ctx context.Context, namespace string) {
+	ContextSegment(ctx).SetNamespace(namespace)
+}
+
+// Namespace returns the namespace.
+func (seg *Segment) Namespace() string {
+	if seg == nil {
+		return ""
+	}
+	seg.mu.RLock()
+	defer seg.mu.RUnlock()
+	return seg.namespace
 }
 
 // AddMetadata adds metadata.
