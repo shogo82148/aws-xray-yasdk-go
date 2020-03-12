@@ -74,6 +74,16 @@ func TestClient(t *testing.T) {
 			{
 				Name:      "example.com",
 				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    ts.URL,
+					},
+					Response: &schema.HTTPResponse{
+						Status:        http.StatusOK,
+						ContentLength: 5,
+					},
+				},
 				Subsegments: []*schema.Segment{
 					{
 						Name: "connect",
@@ -137,6 +147,16 @@ func TestClient_TLS(t *testing.T) {
 			{
 				Name:      "example.com",
 				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    ts.URL,
+					},
+					Response: &schema.HTTPResponse{
+						Status:        http.StatusOK,
+						ContentLength: 5,
+					},
+				},
 				Subsegments: []*schema.Segment{
 					{
 						Name: "connect",
