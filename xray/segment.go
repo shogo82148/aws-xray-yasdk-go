@@ -350,6 +350,16 @@ func (seg *Segment) Namespace() string {
 
 // AddMetadata adds metadata.
 func (seg *Segment) AddMetadata(key string, value interface{}) {
+	seg.AddMetadataToNamespace("default", key, value)
+}
+
+// AddMetadata adds metadata.
+func AddMetadata(ctx context.Context, key string, value interface{}) {
+	ContextSegment(ctx).AddMetadataToNamespace("default", key, value)
+}
+
+// AddMetadataToNamespace adds metadata.
+func (seg *Segment) AddMetadataToNamespace(namespace, key string, value interface{}) {
 	if seg == nil {
 		return
 	}
@@ -358,11 +368,16 @@ func (seg *Segment) AddMetadata(key string, value interface{}) {
 	if seg.metadata == nil {
 		seg.metadata = map[string]interface{}{}
 	}
-	seg.metadata[key] = value
+	if seg.metadata[namespace] == nil {
+		seg.metadata[namespace] = map[string]interface{}{}
+	}
+	if ns, ok := seg.metadata[namespace].(map[string]interface{}); ok {
+		ns[key] = value
+	}
 }
 
-// AddMetadata adds metadata.
-func AddMetadata(ctx context.Context, key string, value interface{}) {
+// AddMetadataToNamespace adds metadata.
+func AddMetadataToNamespace(ctx context.Context, namespace, key string, value interface{}) {
 	ContextSegment(ctx).AddMetadata(key, value)
 }
 

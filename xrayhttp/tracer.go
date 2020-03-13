@@ -57,11 +57,25 @@ func (segs *httpSubsegments) DNSStart(info httptrace.DNSStartInfo) {
 }
 
 func (segs *httpSubsegments) DNSDone(info httptrace.DNSDoneInfo) {
+	type dnsDoneInfo struct {
+		Addresses []string `json:"addresses"`
+		Coalesced bool     `json:"coalesced"`
+	}
+
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 	if segs.dnsCtx == nil {
 		return
 	}
+	addresses := make([]string, 0, len(info.Addrs))
+	for _, addr := range info.Addrs {
+		addresses = append(addresses, addr.String())
+	}
+	meta := dnsDoneInfo{
+		Addresses: addresses,
+		Coalesced: info.Coalesced,
+	}
+	segs.dnsSeg.AddMetadataToNamespace("http", "dns", meta)
 	segs.dnsSeg.AddError(info.Err)
 	segs.dnsSeg.Close()
 	segs.dnsCtx, segs.dnsSeg = nil, nil
