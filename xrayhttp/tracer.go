@@ -90,11 +90,20 @@ func (segs *httpSubsegments) ConnectStart(network, addr string) {
 	segs.dialCtx, segs.dialSeg = xray.BeginSubsegment(segs.connCtx, "dial")
 }
 func (segs *httpSubsegments) ConnectDone(network, addr string, err error) {
+	type dialInfo struct {
+		Network string `json:"network"`
+		Address string `json:"address"`
+	}
+
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 	if segs.dialCtx == nil {
 		return
 	}
+	segs.dialSeg.AddMetadataToNamespace("http", "dial", dialInfo{
+		Network: network,
+		Address: addr,
+	})
 	segs.dialSeg.AddError(err)
 	segs.dialSeg.Close()
 	segs.dialCtx, segs.dialSeg = nil, nil

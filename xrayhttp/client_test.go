@@ -254,7 +254,17 @@ func TestClient_DNS(t *testing.T) {
 									},
 								},
 							},
-							{Name: "dial"},
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": "tcp",
+											"address": net.JoinHostPort("127.0.0.1", u.Port()),
+										},
+									},
+								},
+							},
 						},
 					},
 					{Name: "request"},
