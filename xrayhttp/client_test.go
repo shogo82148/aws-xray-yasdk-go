@@ -341,6 +341,7 @@ func TestClient_DNS(t *testing.T) {
 		addresses = append(addresses[:0], "::1", addr) // addresses may contains IPv6
 		if diff2 := cmp.Diff(want, got, ignoreVariableField); diff2 != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
+			t.Errorf("mismatch (-want +got):\n%s", diff2)
 		}
 	}
 }
