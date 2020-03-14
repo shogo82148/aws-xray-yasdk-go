@@ -36,7 +36,10 @@ func TestClient(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
 
+	ch := make(chan xray.TraceHeader, 1)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceHeader := xray.ParseTraceHeader(r.Header.Get(xray.TraceIDHeaderKey))
+		ch <- traceHeader
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("hello")); err != nil {
 			panic(err)
@@ -116,6 +119,14 @@ func TestClient(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+
+	traceHeader := <-ch
+	if traceHeader.TraceID != got.TraceID {
+		t.Errorf("invalid trace id, want %s, got %s", got.TraceID, traceHeader.TraceID)
+	}
+	if traceHeader.ParentID != got.ID {
+		t.Errorf("invalid parent id, want %s, got %s", got.ID, traceHeader.ParentID)
 	}
 }
 

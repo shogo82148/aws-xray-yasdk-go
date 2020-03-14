@@ -49,7 +49,10 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	ctx, seg := xray.BeginSubsegment(req.Context(), host)
+	ctx := req.Context()
+	req.Header.Set(xray.TraceIDHeaderKey, xray.DownstreamHeader(ctx).String())
+
+	ctx, seg := xray.BeginSubsegment(ctx, host)
 	defer seg.Close()
 	if !isEmptyHost {
 		seg.SetNamespace("remote")

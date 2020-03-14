@@ -50,6 +50,9 @@ type Segment struct {
 	// if the segment is the root, the parent is nil.
 	parent *Segment
 
+	// set by NewSegmentFromHeader
+	traceHeader TraceHeader
+
 	// root segment
 	// if the segment is the root, the root points the segment it self.
 	root *Segment
@@ -124,18 +127,17 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 
 // NewSegmentFromHeader creates a segment for downstream call and add information to the segment that gets from HTTP header.
 func NewSegmentFromHeader(ctx context.Context, name string, r *http.Request, h TraceHeader) (context.Context, *Segment) {
-	// TODO: set ParentID
 	// TODO: sampling
-	traceID := h.TraceID
-	if traceID == "" {
-		traceID = NewTraceID()
+	if h.TraceID == "" {
+		h.TraceID = NewTraceID()
 	}
 	now := nowFunc()
 	seg := &Segment{
 		ctx:           ctx,
 		name:          name, // TODO: @shogo82148 sanitize the name
 		id:            NewSegmentID(),
-		traceID:       traceID,
+		traceID:       h.TraceID,
+		traceHeader:   h,
 		startTime:     now,
 		totalSegments: 1,
 	}
@@ -175,15 +177,6 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	parent.subsegments = append(parent.subsegments, seg)
 
 	return ctx, seg
-}
-
-// Parent returns the parent segment.
-func (seg *Segment) Parent() *Segment {
-	if seg == nil {
-		return nil
-	}
-	// no need to lock because no one writes the parent after BeginSubsegment
-	return seg.parent
 }
 
 type errorPanic struct {
@@ -321,6 +314,24 @@ func (seg *Segment) SetFault() {
 // SetFault sets fault flag.
 func SetFault(ctx context.Context) {
 	ContextSegment(ctx).SetFault()
+}
+
+// DownstreamHeader returns a header for passing to downstream calls.
+func (seg *Segment) DownstreamHeader() TraceHeader {
+	if seg == nil {
+		return TraceHeader{}
+	}
+	seg.mu.RLock()
+	defer seg.mu.RUnlock()
+	h := seg.traceHeader
+	h.TraceID = seg.traceID
+	h.ParentID = seg.id
+	return h
+}
+
+// DownstreamHeader returns a header for passing to downstream calls.
+func DownstreamHeader(ctx context.Context) TraceHeader {
+	return ContextSegment(ctx).DownstreamHeader()
 }
 
 // SetNamespace sets namespace
