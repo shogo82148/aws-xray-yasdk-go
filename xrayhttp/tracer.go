@@ -159,7 +159,22 @@ func tlsVersionName(version uint16) string {
 	}
 
 	// fallback to hex format
-	return fmt.Sprintf("0x%04x", version)
+	return fmt.Sprintf("0x%04X", version)
+}
+
+// copied from https://github.com/golang/go/blob/20a838ab94178c55bc4dc23ddc332fce8545a493/src/crypto/tls/cipher_suites.go#L97-L109
+func cipherSuiteName(id uint16) string {
+	for _, c := range tls.CipherSuites() {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	for _, c := range tls.InsecureCipherSuites() {
+		if c.ID == id {
+			return c.Name
+		}
+	}
+	return fmt.Sprintf("0x%04X", id)
 }
 
 func (segs *httpSubsegments) WroteHeaderField(key string, value []string) {}
