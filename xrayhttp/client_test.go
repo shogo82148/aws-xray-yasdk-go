@@ -42,6 +42,10 @@ func TestClient(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	func() {
 		client := Client(nil)
@@ -91,7 +95,17 @@ func TestClient(t *testing.T) {
 					{
 						Name: "connect",
 						Subsegments: []*schema.Segment{
-							{Name: "dial"},
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": "tcp",
+											"address": u.Host,
+										},
+									},
+								},
+							},
 						},
 					},
 					{Name: "request"},
@@ -115,6 +129,10 @@ func TestClient_TLS(t *testing.T) {
 		}
 	}))
 	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	func() {
 		client := Client(ts.Client())
@@ -164,7 +182,17 @@ func TestClient_TLS(t *testing.T) {
 					{
 						Name: "connect",
 						Subsegments: []*schema.Segment{
-							{Name: "dial"},
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": "tcp",
+											"address": u.Host,
+										},
+									},
+								},
+							},
 							{Name: "tls"},
 						},
 					},
