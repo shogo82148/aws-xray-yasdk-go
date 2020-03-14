@@ -1,6 +1,7 @@
 package xrayhttp
 
 import (
+	"context"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -195,8 +196,22 @@ func TestClient_DNS(t *testing.T) {
 	}
 	u.Host = net.JoinHostPort("loopback.shogo82148.com", u.Port())
 
+	// Specify IP version to avoid falling back
+	addr := u.Hostname()
+	network := "tcp6"
+	if net.ParseIP(addr).To4() != nil {
+		network = "tcp4"
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, addr string) (net.Conn, error) {
+				return new(net.Dialer).DialContext(ctx, network, addr)
+			},
+		},
+	}
+
 	func() {
-		client := Client(nil)
+		client := Client(client)
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		req, err := http.NewRequest(http.MethodGet, u.String(), nil)
@@ -207,12 +222,12 @@ func TestClient_DNS(t *testing.T) {
 		req.Host = "example.com"
 		resp, err := client.Do(req)
 		if err != nil {
-			t.Fatal()
+			t.Fatal(err)
 		}
 		defer resp.Body.Close()
 		data, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			t.Fatal()
+			t.Fatal(err)
 		}
 		if string(data) != "hello" {
 			t.Errorf("want %q, got %q", "hello", string(data))
@@ -248,7 +263,7 @@ func TestClient_DNS(t *testing.T) {
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dns": map[string]interface{}{
-											"addresses": []interface{}{"127.0.0.1"},
+											"addresses": []interface{}{addr},
 											"coalesced": false,
 										},
 									},
@@ -259,8 +274,8 @@ func TestClient_DNS(t *testing.T) {
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
-											"network": "tcp",
-											"address": net.JoinHostPort("127.0.0.1", u.Port()),
+											"network": network,
+											"address": net.JoinHostPort(addr, u.Port()),
 										},
 									},
 								},
