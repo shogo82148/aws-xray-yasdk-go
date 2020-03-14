@@ -287,7 +287,10 @@ func TestClient_DNS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	addresses := append(make([]interface{}, 0, 2), addr)
+	dns := map[string]interface{}{
+		"addresses": []interface{}{addr},
+		"coalesced": false,
+	}
 	want := &schema.Segment{
 		Name: "test",
 		Subsegments: []*schema.Segment{
@@ -312,10 +315,7 @@ func TestClient_DNS(t *testing.T) {
 								Name: "dns",
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
-										"dns": map[string]interface{}{
-											"addresses": addresses,
-											"coalesced": false,
-										},
+										"dns": dns,
 									},
 								},
 							},
@@ -338,10 +338,9 @@ func TestClient_DNS(t *testing.T) {
 		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
-		addresses = append(addresses[:0], "::1", addr) // addresses may contains IPv6
+		dns["addresses"] = []interface{}{"::1", addr} // addresses may contains IPv6
 		if diff2 := cmp.Diff(want, got, ignoreVariableField); diff2 != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
-			t.Errorf("mismatch (-want +got):\n%s", diff2)
 		}
 	}
 }
