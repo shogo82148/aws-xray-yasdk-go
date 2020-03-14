@@ -222,7 +222,6 @@ func TestClient_DNS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	u.Host = net.JoinHostPort("loopback.shogo82148.com", u.Port())
 
 	// Specify IP version to avoid falling back
 	addr := u.Hostname()
@@ -238,6 +237,7 @@ func TestClient_DNS(t *testing.T) {
 		},
 	}
 
+	u.Host = net.JoinHostPort("loopback.shogo82148.com", u.Port())
 	func() {
 		client := Client(client)
 		ctx, root := xray.BeginSegment(ctx, "test")
