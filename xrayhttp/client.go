@@ -2,8 +2,10 @@ package xrayhttp
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 const emptyHostRename = "empty_host_error"
@@ -53,9 +55,35 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		seg.SetNamespace("remote")
 	}
 
+	requestInfo := &schema.HTTPRequest{
+		Method: req.Method,
+		URL:    req.URL.String(),
+	}
+	seg.SetHTTPRequest(requestInfo)
+
 	ctx = WithClientTrace(ctx)
 	req = req.WithContext(ctx)
 	resp, err := rt.Base.RoundTrip(req)
-	seg.AddError(err)
+	if err != nil {
+		seg.AddError(err)
+		return nil, err
+	}
+
+	responseInfo := &schema.HTTPResponse{
+		Status: resp.StatusCode,
+	}
+	if length, err := strconv.Atoi(resp.Header.Get("Content-Length")); err == nil {
+		responseInfo.ContentLength = length
+	}
+	seg.SetHTTPResponse(responseInfo)
+	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+		seg.SetError()
+	}
+	if resp.StatusCode == http.StatusTooManyRequests {
+		seg.SetThrottle()
+	}
+	if resp.StatusCode >= 500 && resp.StatusCode < 600 {
+		seg.SetFault()
+	}
 	return resp, err
 }
