@@ -2,6 +2,7 @@ package xrayhttp
 
 import (
 	"context"
+	"crypto/tls"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -135,7 +136,16 @@ func TestClient_TLS(t *testing.T) {
 	}
 
 	func() {
-		client := Client(ts.Client())
+		// lock the tls version and cipher suites for testing
+		client := ts.Client()
+		if t, ok := client.Transport.(*http.Transport); ok {
+			t.TLSClientConfig.MinVersion = tls.VersionTLS12
+			t.TLSClientConfig.MaxVersion = tls.VersionTLS12
+			t.TLSClientConfig.CipherSuites = []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}
+		}
+
+		client = Client(ts.Client())
+
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
@@ -193,7 +203,18 @@ func TestClient_TLS(t *testing.T) {
 									},
 								},
 							},
-							{Name: "tls"},
+							{
+								Name: "tls",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"tls": map[string]interface{}{
+											"version":                       "tls1.2",
+											"negotiated_protocol_is_mutual": true,
+											"cipher_suite":                  "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+										},
+									},
+								},
+							},
 						},
 					},
 					{Name: "request"},
@@ -318,7 +339,7 @@ func TestClient_DNS(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		addresses = append(addresses[:0], "::1", addr) // addresses may contains IPv6
-		if diff2 := cmp.Diff(want, got); diff2 != "" {
+		if diff2 := cmp.Diff(want, got, ignoreVariableField); diff2 != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
 		}
 	}

@@ -3,6 +3,7 @@ package xrayhttp
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"net/http/httptrace"
 	"net/textproto"
 	"sync"
@@ -118,14 +119,47 @@ func (segs *httpSubsegments) TLSHandshakeStart() {
 	segs.tlsCtx, segs.tlsSeg = xray.BeginSubsegment(segs.connCtx, "tls")
 }
 
-func (segs *httpSubsegments) TLSHandshakeDone(tls.ConnectionState, error) {
+func (segs *httpSubsegments) TLSHandshakeDone(state tls.ConnectionState, err error) {
+	type tlsInfo struct {
+		Version                    string `json:"version,omitempty"`
+		DidResume                  bool   `json:"did_resume,omitempty"`
+		NegotiatedProtocol         string `json:"negotiated_protocol,omitempty"`
+		NegotiatedProtocolIsMutual bool   `json:"negotiated_protocol_is_mutual,omitempty"`
+		CipherSuite                string `json:"cipher_suite,omitempty"`
+	}
+
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 	if segs.tlsCtx == nil {
 		return
 	}
+	segs.tlsSeg.AddMetadataToNamespace("http", "tls", tlsInfo{
+		Version:                    tlsVersionName(state.Version),
+		DidResume:                  state.DidResume,
+		NegotiatedProtocol:         state.NegotiatedProtocol,
+		NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
+		CipherSuite:                tls.CipherSuiteName(state.CipherSuite),
+	})
 	segs.tlsSeg.Close()
 	segs.tlsCtx, segs.tlsSeg = nil, nil
+}
+
+func tlsVersionName(version uint16) string {
+	switch version {
+	case tls.VersionSSL30:
+		return "ssl3.0"
+	case tls.VersionTLS10:
+		return "tls1.0"
+	case tls.VersionTLS11:
+		return "tls1.1"
+	case tls.VersionTLS12:
+		return "tls1.2"
+	case 0x0304: // VersionTLS13 is supported from Go 1.13
+		return "tls1.3"
+	}
+
+	// fallback to hex format
+	return fmt.Sprintf("0x%04x", version)
 }
 
 func (segs *httpSubsegments) WroteHeaderField(key string, value []string) {}
