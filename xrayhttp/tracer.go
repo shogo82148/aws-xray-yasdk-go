@@ -138,7 +138,7 @@ func (segs *httpSubsegments) TLSHandshakeDone(state tls.ConnectionState, err err
 		DidResume:                  state.DidResume,
 		NegotiatedProtocol:         state.NegotiatedProtocol,
 		NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
-		CipherSuite:                tls.CipherSuiteName(state.CipherSuite),
+		CipherSuite:                cipherSuiteName(state.CipherSuite),
 	})
 	segs.tlsSeg.Close()
 	segs.tlsCtx, segs.tlsSeg = nil, nil
