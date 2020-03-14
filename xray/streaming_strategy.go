@@ -56,6 +56,11 @@ func serialize(seg *Segment) *schema.Segment {
 	}
 	if seg.isRoot() {
 		ret.TraceID = seg.traceID
+		if parentID := seg.traceHeader.ParentID; parentID != "" {
+			// the parent is on upstream
+			ret.ParentID = parentID
+			ret.Type = "subsegment"
+		}
 	}
 
 	for _, sub := range seg.subsegments {
@@ -109,7 +114,13 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 		ret.EndTime = originEpoch + seg.endTime.Sub(originTime).Seconds()
 	}
 
-	if !seg.isRoot() {
+	if seg.isRoot() {
+		if parentID := seg.traceHeader.ParentID; parentID != "" {
+			// the parent is on upstream
+			ret.ParentID = parentID
+			ret.Type = "subsegment"
+		}
+	} else {
 		ret.ParentID = seg.parent.id
 		ret.Type = "subsegment"
 	}

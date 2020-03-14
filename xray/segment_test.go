@@ -184,3 +184,37 @@ func TestAddError(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestDownstreamHeader(t *testing.T) {
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	ctx, seg := BeginSegment(ctx, "foobar")
+	defer seg.Close()
+	h := DownstreamHeader(ctx)
+	if h.TraceID != seg.traceID {
+		t.Errorf("invalid trace id: want %s, got %s", seg.traceID, h.TraceID)
+	}
+	if h.ParentID != seg.id {
+		t.Errorf("invalid parent id: want %s, got %s", seg.id, h.ParentID)
+	}
+}
+
+func TestDownstreamHeader_InheritUpstream(t *testing.T) {
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	upstream := ParseTraceHeader("Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51;foo=bar")
+	ctx, seg := NewSegmentFromHeader(ctx, "foobar", nil, upstream)
+	defer seg.Close()
+	h := DownstreamHeader(ctx)
+	if h.TraceID != "1-5e645f3e-1dfad076a177c5ccc5de12f5" {
+		t.Errorf("invalid trace id: want %s, got %s", "1-5e645f3e-1dfad076a177c5ccc5de12f5", h.TraceID)
+	}
+	if h.ParentID != seg.id {
+		t.Errorf("invalid parent id: want %s, got %s", seg.id, h.ParentID)
+	}
+	if h.AdditionalData["foo"] != "bar" {
+		t.Errorf("invalid additional data: want %s, got %s", "bar", h.AdditionalData["foo"])
+	}
+}
