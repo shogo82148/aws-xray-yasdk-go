@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
@@ -45,6 +46,7 @@ type Segment struct {
 	startTime time.Time
 	endTime   time.Time
 	status    segmentStatus
+	sampled   bool
 
 	// parent segment
 	// if the segment is the root, the parent is nil.
@@ -111,37 +113,57 @@ func WithSegment(ctx context.Context, seg *Segment) context.Context {
 //
 // Caller should close the segment when the work is done.
 func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) {
-	now := nowFunc()
+	return BeginSegmentWithRequest(ctx, name, nil)
+}
+
+// BeginSegmentWithRequest creates a new Segment for a given name and context.
+//
+// Caller should close the segment when the work is done.
+func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) (context.Context, *Segment) {
 	seg := &Segment{
 		ctx:           ctx,
 		name:          name, // TODO: @shogo82148 sanitize the name
 		id:            NewSegmentID(),
-		traceID:       NewTraceID(),
-		startTime:     now,
+		startTime:     nowFunc(),
 		totalSegments: 1,
 	}
 	seg.root = seg
-	ctx = context.WithValue(ctx, segmentContextKey, seg)
-	return ctx, seg
-}
 
-// NewSegmentFromHeader creates a segment for downstream call and add information to the segment that gets from HTTP header.
-func NewSegmentFromHeader(ctx context.Context, name string, r *http.Request, h TraceHeader) (context.Context, *Segment) {
-	// TODO: sampling
+	var h TraceHeader
+	var sampled bool
+	if r != nil {
+		// Sampling strategy for http calls
+		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
+		switch h.SamplingDecision {
+		case SamplingDecisionSampled:
+			Debug(ctx, "Incoming header decided: Sampled=true")
+			sampled = true
+		case SamplingDecisionNotSampled:
+			Debug(ctx, "Incoming header decided: Sampled=false")
+		default:
+			client := seg.client()
+			sd := client.samplingStrategy.ShouldTrace(&sampling.Request{
+				Host:   r.Host,
+				URL:    r.URL.Path,
+				Method: r.Method,
+				// TODO: ServiceName
+				// TODO: ServiceType
+			})
+			seg.sampled = sd.Sample
+			Debugf(ctx, "SamplingStrategy decided: %t", sampled)
+		}
+	} else {
+		client := seg.client()
+		sd := client.samplingStrategy.ShouldTrace(nil)
+		seg.sampled = sd.Sample
+		Debugf(ctx, "SamplingStrategy decided: %t", sampled)
+	}
 	if h.TraceID == "" {
 		h.TraceID = NewTraceID()
 	}
-	now := nowFunc()
-	seg := &Segment{
-		ctx:           ctx,
-		name:          name, // TODO: @shogo82148 sanitize the name
-		id:            NewSegmentID(),
-		traceID:       h.TraceID,
-		traceHeader:   h,
-		startTime:     now,
-		totalSegments: 1,
-	}
-	seg.root = seg
+	seg.traceID = h.TraceID
+	seg.traceHeader = h
+
 	ctx = context.WithValue(ctx, segmentContextKey, seg)
 	return ctx, seg
 }
@@ -199,7 +221,9 @@ func (seg *Segment) Close() {
 		seg.AddError(&errorPanic{err: err})
 	}
 	seg.close()
-	seg.emit()
+	if seg.sampled {
+		seg.emit()
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -226,11 +250,19 @@ func (seg *Segment) inProgress() bool {
 }
 
 func (seg *Segment) emit() {
-	client := seg.ctx.Value(clientContextKey)
-	if client == nil {
-		client = defaultClient
+	seg.client().Emit(seg.ctx, seg)
+}
+
+func (seg *Segment) client() *Client {
+	if seg == nil {
+		return defaultClient
 	}
-	client.(*Client).Emit(seg.ctx, seg)
+	seg.mu.RLock()
+	defer seg.mu.RUnlock()
+	if client := seg.ctx.Value(clientContextKey); client != nil {
+		return client.(*Client)
+	}
+	return defaultClient
 }
 
 func newExceptionID() string {

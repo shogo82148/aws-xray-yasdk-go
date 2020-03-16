@@ -65,6 +65,7 @@ func New(config *Config) *Client {
 			},
 		},
 		streamingStrategy: streamingStrategy,
+		samplingStrategy:  samplingStrategy,
 	}
 	return client
 }

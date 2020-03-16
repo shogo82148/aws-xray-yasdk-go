@@ -2,6 +2,7 @@ package xray
 
 import (
 	"errors"
+	"net/http"
 	"regexp"
 	"testing"
 	"time"
@@ -204,8 +205,12 @@ func TestDownstreamHeader_InheritUpstream(t *testing.T) {
 	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
-	upstream := ParseTraceHeader("Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51;foo=bar")
-	ctx, seg := NewSegmentFromHeader(ctx, "foobar", nil, upstream)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(TraceIDHeaderKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51;foo=bar")
+	ctx, seg := BeginSegmentWithRequest(ctx, "foobar", req)
 	defer seg.Close()
 	h := DownstreamHeader(ctx)
 	if h.TraceID != "1-5e645f3e-1dfad076a177c5ccc5de12f5" {
