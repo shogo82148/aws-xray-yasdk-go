@@ -205,7 +205,7 @@ func TestDownstreamHeader_InheritUpstream(t *testing.T) {
 	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", nil)
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
