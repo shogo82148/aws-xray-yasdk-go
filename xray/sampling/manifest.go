@@ -84,7 +84,7 @@ func (m *Manifest) Validate() error {
 			if r.FixedTarget < 0 || r.Rate < 0 {
 				return errors.New("xray/sampling: all rules must have non-negative values for fixed_target and rate")
 			}
-			if r.ServiceName != "" || r.HTTPMethod != "" || r.URLPath != "" {
+			if r.ServiceName != "" || r.Host == "" || r.HTTPMethod == "" || r.URLPath == "" {
 				return errors.New("xray/sampling: all non-default rules must have values for url_path, service_name, and http_method")
 			}
 		}
@@ -93,7 +93,7 @@ func (m *Manifest) Validate() error {
 			if r.FixedTarget < 0 || r.Rate < 0 {
 				return errors.New("xray/sampling: all rules must have non-negative values for fixed_target and rate")
 			}
-			if r.Host != "" || r.ServiceName != "" || r.HTTPMethod != "" || r.URLPath != "" {
+			if r.Host != "" && r.ServiceName == "" || r.HTTPMethod == "" || r.URLPath == "" {
 				return errors.New("xray/sampling: all non-default rules must have values for host, url_path, service_name, and http_method")
 			}
 		}
@@ -132,6 +132,9 @@ func (m *Manifest) normalize() {
 
 // Match returns whether the sampling rule matches against given parameters.
 func (r *Rule) Match(req *Request) bool {
+	if req == nil {
+		return true
+	}
 	return (req.Host == "" || WildcardMatch(r.Host, req.Host, true)) &&
 		(req.URL == "" || WildcardMatch(r.URLPath, req.URL, true)) &&
 		(req.Method == "" || WildcardMatch(r.HTTPMethod, req.Method, true))
