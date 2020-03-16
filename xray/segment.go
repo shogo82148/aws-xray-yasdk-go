@@ -155,7 +155,7 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 		client := seg.client()
 		sd := client.samplingStrategy.ShouldTrace(nil)
 		seg.sampled = sd.Sample
-		Debugf(ctx, "SamplingStrategy decided: %t", sampled)
+		Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 	}
 	if h.TraceID == "" {
 		h.TraceID = NewTraceID()
