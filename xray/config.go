@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"unicode"
+
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 )
 
 // Config is a configure for connecting AWS X-Ray daemon
@@ -15,6 +17,7 @@ type Config struct {
 	DaemonAddress string
 
 	StreamingStrategy StreamingStrategy
+	SamplingStrategy  sampling.Strategy
 
 	// TODO: @shogo82148
 	// AWS_XRAY_TRACING_NAME
