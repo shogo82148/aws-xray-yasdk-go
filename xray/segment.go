@@ -130,14 +130,13 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 	seg.root = seg
 
 	var h TraceHeader
-	var sampled bool
 	if r != nil {
 		// Sampling strategy for http calls
 		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
 		switch h.SamplingDecision {
 		case SamplingDecisionSampled:
 			Debug(ctx, "Incoming header decided: Sampled=true")
-			sampled = true
+			seg.sampled = true
 		case SamplingDecisionNotSampled:
 			Debug(ctx, "Incoming header decided: Sampled=false")
 		default:
