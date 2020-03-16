@@ -119,15 +119,15 @@ func (m *Manifest) Copy() *Manifest {
 }
 
 func (m *Manifest) normalize() {
-	if m.Version == 1 {
-		m.Version = 2
-		for _, r := range m.Rules {
-			// service_name is renamed to host
-			r.Host = r.ServiceName
-			r.ServiceName = ""
-		}
+	if m.Version == 2 {
+		return
 	}
-	return
+	m.Version = 2
+	for _, r := range m.Rules {
+		// service_name is renamed to host
+		r.Host = r.ServiceName
+		r.ServiceName = ""
+	}
 }
 
 // Match returns whether the sampling rule matches against given parameters.
