@@ -37,7 +37,7 @@ func Handler(tn TracingNamer, h http.Handler) http.Handler {
 
 func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := tracer.tn.TracingName(r)
-	ctx, seg := xray.BeginWithRequest(r.Context(), name, r)
+	ctx, seg := xray.BeginSegmentWithRequest(r.Context(), name, r)
 	defer seg.Close()
 	r = r.WithContext(ctx)
 
