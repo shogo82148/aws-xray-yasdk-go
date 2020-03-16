@@ -57,6 +57,95 @@ func TestBeginSegment(t *testing.T) {
 	}
 }
 
+func TestBeginSegmentWithRequest(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(TraceIDHeaderKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51;foo=bar")
+	ctx, seg := BeginSegmentWithRequest(ctx, "foobar", req)
+	_ = ctx // do something using ctx
+	seg.Close()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		ParentID:  "03babb4ba280be51",
+		Type:      "subsegment",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestBeginSegmentWithRequest_NotSampled(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// trace header with "Sampled=0"
+	req.Header.Set(TraceIDHeaderKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Sampled=0")
+	ctx, seg := BeginSegmentWithRequest(ctx, "foobar", req)
+	_ = ctx // do something using ctx
+	seg.Close()
+
+	if _, err := td.Recv(); err == nil {
+		t.Error("want timeout, but not")
+	}
+}
+
+func TestBeginSegmentWithRequest_Sampled(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// trace header with "Sampled=0"
+	req.Header.Set(TraceIDHeaderKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Sampled=1")
+	ctx, seg := BeginSegmentWithRequest(ctx, "foobar", req)
+	_ = ctx // do something using ctx
+	seg.Close()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
 func TestBeginSubsegment(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()
