@@ -200,6 +200,14 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	return ctx, seg
 }
 
+// Sampled returns whether the current segment is sampled.
+func (seg *Segment) Sampled() bool {
+	root := seg.root
+	root.mu.Lock()
+	defer root.mu.Unlock()
+	return root.sampled
+}
+
 type errorPanic struct {
 	err interface{}
 }
@@ -220,7 +228,7 @@ func (seg *Segment) Close() {
 		seg.AddError(&errorPanic{err: err})
 	}
 	seg.close()
-	if seg.sampled {
+	if seg.Sampled() {
 		seg.emit()
 	}
 	if err != nil {
