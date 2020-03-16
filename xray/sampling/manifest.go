@@ -34,7 +34,7 @@ type Rule struct {
 	// FixedTarget
 	FixedTarget int64 `json:"fixed_target"`
 
-	// The percentage of matching requests to instrument, after the reservoir is exhausted.
+	// The rate of matching requests to instrument, after the reservoir is exhausted.
 	Rate float64 `json:"rate"`
 }
 
