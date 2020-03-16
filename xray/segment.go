@@ -149,7 +149,7 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 				// TODO: ServiceType
 			})
 			seg.sampled = sd.Sample
-			Debugf(ctx, "SamplingStrategy decided: %t", sampled)
+			Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 		}
 	} else {
 		client := seg.client()
