@@ -1,6 +1,11 @@
 package sampling
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
+	"github.com/aws/aws-sdk-go/aws/request"
+	"github.com/aws/aws-sdk-go/aws/session"
 	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
@@ -17,9 +22,45 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 	if err != nil {
 		return nil, err
 	}
+	x, err := newXRaySvc(addr)
+	if err != nil {
+		return nil, err
+	}
 	return &CentralizedStrategy{
 		fallback: local,
+		xray:     x,
 	}, nil
+}
+
+// newXRaySvc returns a new AWS X-Ray client that connects to addr.
+// The requests are unsigned and it is expected that the XRay daemon signs and forwards the requests.
+func newXRaySvc(addr string) (*xraySvc.XRay, error) {
+	url := "http://" + addr
+	// Endpoint resolver for proxying requests through the daemon
+	f := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
+		return endpoints.ResolvedEndpoint{
+			URL: url,
+		}, nil
+	}
+
+	// Dummy session for unsigned requests
+	sess, err := session.NewSession(&aws.Config{
+		Region:           aws.String("us-west-1"),
+		Credentials:      credentials.NewStaticCredentials("", "", ""),
+		EndpointResolver: endpoints.ResolverFunc(f),
+	})
+	if err != nil {
+		return nil, err
+	}
+	x := xraySvc.New(sess)
+
+	// Remove Signer and replace with No-Op handler
+	x.Handlers.Sign.Clear()
+	x.Handlers.Sign.PushBack(func(*request.Request) {
+		// do nothing
+	})
+
+	return x, nil
 }
 
 // Close stops polling.
