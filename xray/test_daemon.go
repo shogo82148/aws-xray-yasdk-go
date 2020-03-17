@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
@@ -51,7 +52,8 @@ func NewTestDaemon(handler http.Handler) (context.Context, *TestDaemon) {
 		address += " tcp:" + u.Host
 	}
 	ctx = context.WithValue(ctx, clientContextKey, New(&Config{
-		DaemonAddress: address,
+		DaemonAddress:    address,
+		SamplingStrategy: sampling.NewAllStrategy(),
 	}))
 
 	go d.run(c)

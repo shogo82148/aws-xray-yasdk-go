@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
@@ -23,12 +24,12 @@ var defaultClient = New(nil)
 // Client is a client for AWS X-Ray daemon.
 type Client struct {
 	// the address of the AWS X-Ray daemon
-	tcp string
 	udp string
 
 	pool sync.Pool
 
 	streamingStrategy StreamingStrategy
+	samplingStrategy  sampling.Strategy
 
 	mu   sync.Mutex
 	conn net.Conn
@@ -36,13 +37,27 @@ type Client struct {
 
 // New returns a new Client.
 func New(config *Config) *Client {
+	// initialize sampling strategy
 	p := config.daemonEndpoints()
+	var samplingStrategy sampling.Strategy
+	if config != nil {
+		samplingStrategy = config.SamplingStrategy
+	}
+	if samplingStrategy == nil {
+		var err error
+		samplingStrategy, err = sampling.NewCentralizedStrategy(p.TCP, nil)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// initialize streaming strategy
 	streamingStrategy := NewStreamingStrategyLimitSubsegment(20)
 	if config != nil && config.StreamingStrategy != nil {
 		streamingStrategy = config.StreamingStrategy
 	}
+
 	client := &Client{
-		tcp: p.TCP,
 		udp: p.UDP,
 		pool: sync.Pool{
 			New: func() interface{} {
@@ -50,6 +65,7 @@ func New(config *Config) *Client {
 			},
 		},
 		streamingStrategy: streamingStrategy,
+		samplingStrategy:  samplingStrategy,
 	}
 	return client
 }
