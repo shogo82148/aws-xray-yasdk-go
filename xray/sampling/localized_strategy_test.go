@@ -28,7 +28,7 @@ func TestLocalizedStrategy(t *testing.T) {
 	}
 
 	var random float64
-	s.randFloat64 = func() float64 { return random }
+	s.randFunc = func() float64 { return random }
 	testRate := func(req *Request, rate float64) {
 		t.Helper()
 		random = rate

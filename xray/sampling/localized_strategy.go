@@ -18,7 +18,7 @@ type LocalizedStrategy struct {
 	reservoirs       []*reservoir
 	defaultReservoir *reservoir
 	mu               sync.Mutex
-	randFloat64      func() float64
+	randFunc         func() float64
 }
 
 // NewLocalizedStrategy returns new LocalizedStrategy.
@@ -66,16 +66,22 @@ func (s *LocalizedStrategy) sampling(r *reservoir, rate float64) *Decision {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.randFloat64 == nil {
-		// lazy initialize of random generator
-		var seed int64
-		if err := binary.Read(crand.Reader, binary.BigEndian, &seed); err != nil {
-			// fallback to timestamp
-			seed = time.Now().UnixNano()
-		}
-		s.randFloat64 = rand.New(rand.NewSource(seed)).Float64
-	}
 	return &Decision{
-		Sample: s.randFloat64() < rate,
+		Sample: s.randLocked() < rate,
 	}
+}
+
+// returns a pseudo-random number in [0.0,1.0). s.mu should be locked.
+func (s *LocalizedStrategy) randLocked() float64 {
+	if s.randFunc != nil {
+		return s.randFunc()
+	}
+	// lazy initialize of random generator
+	var seed int64
+	if err := binary.Read(crand.Reader, binary.BigEndian, &seed); err != nil {
+		// fallback to timestamp
+		seed = time.Now().UnixNano()
+	}
+	s.randFunc = rand.New(rand.NewSource(seed)).Float64
+	return s.randFunc()
 }

@@ -1,6 +1,11 @@
 package sampling
 
 import (
+	"context"
+	crand "crypto/rand"
+	"fmt"
+	"sync"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
@@ -9,10 +14,24 @@ import (
 	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
+const defaultRule = "Default"
+const defaultInterval = int64(10)
+
+const manifestTTL = 3600 // Seconds
+
 // CentralizedStrategy is an implementation of SamplingStrategy.
 type CentralizedStrategy struct {
+	// Sampling strategy used if centralized manifest is expired
 	fallback *LocalizedStrategy
-	xray     *xraySvc.XRay
+
+	// AWS X-Ray client
+	xray *xraySvc.XRay
+
+	// Unique ID used by XRay service to identify this client
+	clientID string
+
+	mu       sync.RWMutex
+	manifest *centralizedManifest
 }
 
 // NewCentralizedStrategy returns new centralized sampling strategy with a fallback on
@@ -22,13 +41,22 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 	if err != nil {
 		return nil, err
 	}
+
 	x, err := newXRaySvc(addr)
 	if err != nil {
 		return nil, err
 	}
+
+	// Generate clientID
+	var r [12]byte
+	if _, err := crand.Read(r[:]); err != nil {
+		return nil, err
+	}
+
 	return &CentralizedStrategy{
 		fallback: local,
 		xray:     x,
+		clientID: fmt.Sprintf("%x", r),
 	}, nil
 }
 
@@ -71,5 +99,10 @@ func (s *CentralizedStrategy) Close() {
 // ShouldTrace implements Strategy.
 func (s *CentralizedStrategy) ShouldTrace(req *Request) *Decision {
 	// TODO: @shogo82148 implement me!
+	ctx := context.Background()
+	s.xray.GetSamplingRulesWithContext(ctx, &xraySvc.GetSamplingRulesInput{})
+	s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
+		SamplingStatisticsDocuments: nil, // TODO: fill me
+	})
 	return s.fallback.ShouldTrace(req)
 }
