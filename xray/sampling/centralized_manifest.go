@@ -135,7 +135,7 @@ func (q *centralizedQuota) Sample() bool {
 	}
 
 	// fall back to the Bernoulli distribution
-	if q.randFunc() < q.fixedRate {
+	if q.randLocked() < q.fixedRate {
 		q.sampled++
 		return true
 	}
