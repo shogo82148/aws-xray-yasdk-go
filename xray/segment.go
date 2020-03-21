@@ -11,6 +11,7 @@ import (
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 var nowFunc func() time.Time = time.Now
@@ -26,7 +27,6 @@ func (k *contextKey) String() string { return "xray context value " + k.name }
 var (
 	segmentContextKey = &contextKey{"segment"}
 	clientContextKey  = &contextKey{"client"}
-	loggerContextKey  = &contextKey{"logger"}
 )
 
 type segmentStatus int
@@ -135,10 +135,10 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
 		switch h.SamplingDecision {
 		case SamplingDecisionSampled:
-			Debug(ctx, "Incoming header decided: Sampled=true")
+			xraylog.Debug(ctx, "Incoming header decided: Sampled=true")
 			seg.sampled = true
 		case SamplingDecisionNotSampled:
-			Debug(ctx, "Incoming header decided: Sampled=false")
+			xraylog.Debug(ctx, "Incoming header decided: Sampled=false")
 		default:
 			client := seg.client()
 			sd := client.samplingStrategy.ShouldTrace(&sampling.Request{
@@ -149,13 +149,13 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 				// TODO: ServiceType
 			})
 			seg.sampled = sd.Sample
-			Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
+			xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 		}
 	} else {
 		client := seg.client()
 		sd := client.samplingStrategy.ShouldTrace(nil)
 		seg.sampled = sd.Sample
-		Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
+		xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 	}
 	if h.TraceID == "" {
 		h.TraceID = NewTraceID()
@@ -219,9 +219,9 @@ func (err *errorPanic) Error() string {
 // Close closes the segment.
 func (seg *Segment) Close() {
 	if seg.parent != nil {
-		Debugf(seg.ctx, "Closing subsegment named %s", seg.name)
+		xraylog.Debugf(seg.ctx, "Closing subsegment named %s", seg.name)
 	} else {
-		Debugf(seg.ctx, "Closing segment named %s", seg.name)
+		xraylog.Debugf(seg.ctx, "Closing segment named %s", seg.name)
 	}
 	err := recover()
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 const emitTimeout = 100 * time.Millisecond
@@ -84,10 +85,10 @@ func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
 	buf.Write(header)
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(seg); err != nil {
-		Errorf(ctx, "failed to encode: %v", err)
+		xraylog.Errorf(ctx, "failed to encode: %v", err)
 		return
 	}
-	Debugf(ctx, "emit: %s", buf.Bytes()[len(header):])
+	xraylog.Debugf(ctx, "emit: %s", buf.Bytes()[len(header):])
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -97,13 +98,13 @@ func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
 
 		conn, err := dialer.DialContext(emitCtx, "udp", c.udp)
 		if err != nil {
-			Errorf(ctx, "failed to dial: %v", err)
+			xraylog.Errorf(ctx, "failed to dial: %v", err)
 			return
 		}
 		c.conn = conn
 	}
 	if _, err := c.conn.Write(buf.Bytes()); err != nil {
-		Errorf(ctx, "failed to write: %v", err)
+		xraylog.Errorf(ctx, "failed to write: %v", err)
 		return
 	}
 }
