@@ -135,7 +135,7 @@ func (r *Rule) Match(req *Request) bool {
 	if req == nil {
 		return true
 	}
-	return (req.Host == "" || WildcardMatch(r.Host, req.Host, true)) &&
-		(req.URL == "" || WildcardMatch(r.URLPath, req.URL, true)) &&
-		(req.Method == "" || WildcardMatch(r.HTTPMethod, req.Method, true))
+	return (req.Host == "" || WildcardMatchCaseInsensitive(r.Host, req.Host)) &&
+		(req.URL == "" || WildcardMatchCaseInsensitive(r.URLPath, req.URL)) &&
+		(req.Method == "" || WildcardMatchCaseInsensitive(r.HTTPMethod, req.Method))
 }
