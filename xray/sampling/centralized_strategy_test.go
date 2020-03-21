@@ -2,6 +2,7 @@ package sampling
 
 import (
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -116,5 +117,72 @@ func TestCentralizedStrategy_refreshRule(t *testing.T) {
 	}
 	if s.manifest.Quotas["Test"] != quota {
 		t.Error("want quota not to be changed, but changed")
+	}
+}
+
+func TestCentralizedStrategy_refreshQuota(t *testing.T) {
+	s, err := NewCentralizedStrategy("127.0.0.1", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.xray = &xrayMock{
+		getSamplingTargetsWithContext: func(ctx aws.Context, in *xraySvc.GetSamplingTargetsInput, opts ...request.Option) (*xraySvc.GetSamplingTargetsOutput, error) {
+			if len(in.SamplingStatisticsDocuments) != 1 {
+				t.Errorf("want %d, got %d", 1, len(in.SamplingStatisticsDocuments))
+			}
+			stat := in.SamplingStatisticsDocuments[0]
+			if aws.Int64Value(stat.RequestCount) != 30 {
+				t.Errorf("unexpected RequestCount: want %d, got %d", 30, aws.Int64Value(stat.RequestCount))
+			}
+			if aws.Int64Value(stat.BorrowCount) != 10 {
+				t.Errorf("unexpected BorrowCount: want %d, got %d", 10, aws.Int64Value(stat.BorrowCount))
+			}
+			if aws.Int64Value(stat.SampledCount) != 20 {
+				t.Errorf("unexpected SampledCount: want %d, got %d", 10, aws.Int64Value(stat.SampledCount))
+			}
+			if aws.StringValue(stat.RuleName) != "FooBar" {
+				t.Errorf("unexpected RuleName: want %q, got %q", "FooBar", aws.StringValue(stat.RuleName))
+			}
+			return &xraySvc.GetSamplingTargetsOutput{
+				SamplingTargetDocuments: []*xraySvc.SamplingTargetDocument{
+					{
+						RuleName:          aws.String("FooBar"),
+						ReservoirQuota:    aws.Int64(13),
+						FixedRate:         aws.Float64(0.5),
+						ReservoirQuotaTTL: aws.Time(time.Unix(1000000000, 0)),
+						Interval:          aws.Int64(15),
+					},
+				},
+			}, nil
+		},
+	}
+	quota := &centralizedQuota{
+		requests: 30,
+		borrowed: 10,
+		sampled:  20,
+	}
+	s.manifest = &centralizedManifest{
+		Rules: []*centralizedRule{
+			{
+				quota:    quota,
+				ruleName: "FooBar",
+			},
+		},
+		Quotas: map[string]*centralizedQuota{
+			"FooBar": quota,
+		},
+		RefreshedAt: time.Now(),
+	}
+
+	s.refreshQuota()
+
+	if quota.fixedRate != 0.5 {
+		t.Errorf("unexpected fixed rate: want %f, got %f", 0.5, quota.fixedRate)
+	}
+	if quota.quota != 13 {
+		t.Errorf("unexpected quota: want %d, got %d", 13, quota.quota)
+	}
+	if quota.ttl.Unix() != 1000000000 {
+		t.Errorf("unexpected ttl: want %d, got %d", 1000000000, quota.ttl.Unix())
 	}
 }
