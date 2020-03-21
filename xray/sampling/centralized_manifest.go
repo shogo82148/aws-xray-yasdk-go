@@ -12,8 +12,7 @@ import (
 )
 
 type centralizedManifest struct {
-	Default *centralizedRule
-	Rules   []*centralizedRule
+	Rules []*centralizedRule
 }
 
 type centralizedRule struct {
