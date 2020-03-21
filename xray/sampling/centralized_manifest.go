@@ -12,7 +12,9 @@ import (
 )
 
 type centralizedManifest struct {
-	Rules []*centralizedRule
+	Rules       []*centralizedRule
+	Quotas      map[string]*centralizedQuota
+	RefreshedAt time.Time
 }
 
 type centralizedRule struct {

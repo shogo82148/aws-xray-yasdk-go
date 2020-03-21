@@ -209,16 +209,24 @@ func (s *CentralizedStrategy) refreshRule() (err error) {
 	s.muRefresh.Lock()
 	defer s.muRefresh.Unlock()
 
-	rules := []*centralizedRule{}
+	manifest := s.getManifest()
+	rules := make([]*centralizedRule, 0, len(manifest.Rules))
+	quotas := make(map[string]*centralizedQuota, len(manifest.Rules))
 	err = s.xray.GetSamplingRulesPagesWithContext(ctx, &xraySvc.GetSamplingRulesInput{}, func(out *xraySvc.GetSamplingRulesOutput, lastPage bool) bool {
 		for _, record := range out.SamplingRuleRecords {
 			r := record.SamplingRule
-			rule := &centralizedRule{
-				quota: &centralizedQuota{
-					// TODO: use current quota
+			name := aws.StringValue(r.RuleName)
+			quota, ok := manifest.Quotas[name]
+			if !ok {
+				// we don't have enough sampling statistics,
+				// so borrow the reservoir quota.
+				quota = &centralizedQuota{
 					fixedRate: aws.Float64Value(r.FixedRate),
-				},
-				ruleName:    aws.StringValue(r.RuleName),
+				}
+			}
+			rule := &centralizedRule{
+				quota:       quota,
+				ruleName:    name,
 				priority:    aws.Int64Value(r.Priority),
 				host:        aws.StringValue(r.Host),
 				httpMethod:  aws.StringValue(r.HTTPMethod),
@@ -226,17 +234,19 @@ func (s *CentralizedStrategy) refreshRule() (err error) {
 				serviceType: aws.StringValue(r.ServiceType),
 			}
 			rules = append(rules, rule)
+			quotas[name] = quota
 		}
 		return true
 	})
 	if err != nil {
 		return err
 	}
-	manifest := &centralizedManifest{
-		Rules: rules,
-	}
 
-	s.setManifest(manifest)
+	s.setManifest(&centralizedManifest{
+		Rules:       rules,
+		Quotas:      quotas,
+		RefreshedAt: time.Now(),
+	})
 	return nil
 }
 
@@ -252,9 +262,49 @@ func (s *CentralizedStrategy) refreshQuota() (err error) {
 	s.muRefresh.Lock()
 	defer s.muRefresh.Unlock()
 
-	s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
-		SamplingStatisticsDocuments: nil, // TODO: fill me
-	})
+	manifest := s.getManifest()
+	now := time.Now()
+	stats := make([]*xraySvc.SamplingStatisticsDocument, 0, len(manifest.Rules))
+	for _, r := range manifest.Rules {
+		stat := r.quota.Stats()
+		stats = append(stats, &xraySvc.SamplingStatisticsDocument{
+			ClientID:     &s.clientID,
+			RuleName:     &r.ruleName,
+			RequestCount: &stat.requests,
+			SampledCount: &stat.sampled,
+			BorrowCount:  &stat.borrowed,
+			Timestamp:    &now,
+		})
+	}
 
+	resp, err := s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
+		SamplingStatisticsDocuments: stats,
+	})
+	if err != nil {
+		return err
+	}
+
+	needRefresh := false
+	for _, doc := range resp.SamplingTargetDocuments {
+		quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]
+		if !ok {
+			// new rule may be added? try to refresh.
+			needRefresh = true
+		}
+		quota.Update(doc)
+	}
+
+	// TODO update the interval.
+
+	// check the rules are updated.
+	needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
+
+	if needRefresh {
+		go func() {
+			if err := s.refreshRule(); err != nil {
+				// TODO: log err
+			}
+		}()
+	}
 	return nil
 }
