@@ -61,7 +61,7 @@ func (r *centralizedRule) Sample() *Decision {
 }
 
 type centralizedQuota struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 
 	// randFunc returns, as a float64, a pseudo-random number in [0.0,1.0).
 	randFunc func() float64
