@@ -2,6 +2,7 @@ package sampling
 
 import (
 	"math"
+	"sort"
 	"testing"
 	"time"
 
@@ -89,5 +90,35 @@ func TestCentralizedQuota_Sample(t *testing.T) {
 	}
 	if stats.sampled != 0 {
 		t.Errorf("unexpected borrowed: want %d, got%d", 0, stats.sampled)
+	}
+}
+
+var _ sort.Interface = centralizedRuleSlice(nil)
+
+func TestCentralizedRuleSlice(t *testing.T) {
+	rules := []*centralizedRule{
+		{
+			ruleName: "B",
+			priority: 20,
+		},
+		{
+			ruleName: "A",
+			priority: 10,
+		},
+		{
+			ruleName: "C",
+			priority: 20,
+		},
+	}
+	sort.Stable(centralizedRuleSlice(rules))
+
+	if rules[0].ruleName != "A" {
+		t.Errorf("want %q, got %q", "A", rules[0].ruleName)
+	}
+	if rules[1].ruleName != "B" {
+		t.Errorf("want %q, got %q", "B", rules[1].ruleName)
+	}
+	if rules[2].ruleName != "C" {
+		t.Errorf("want %q, got %q", "C", rules[2].ruleName)
 	}
 }

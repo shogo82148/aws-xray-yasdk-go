@@ -195,3 +195,14 @@ func (q *centralizedQuota) Stats() centralizedQuotaStats {
 	q.sampled = 0
 	return ret
 }
+
+type centralizedRuleSlice []*centralizedRule
+
+func (s centralizedRuleSlice) Len() int { return len(s) }
+func (s centralizedRuleSlice) Less(i, j int) bool {
+	if s[i].priority == s[j].priority {
+		return s[i].ruleName < s[j].ruleName
+	}
+	return s[i].priority < s[j].priority
+}
+func (s centralizedRuleSlice) Swap(i, j int) { s[i], s[j] = s[j], s[i] }

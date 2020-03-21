@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -248,6 +249,7 @@ func (s *CentralizedStrategy) refreshRule() (err error) {
 	if err != nil {
 		return err
 	}
+	sort.Stable(centralizedRuleSlice(rules))
 
 	s.setManifest(&centralizedManifest{
 		Rules:       rules,
