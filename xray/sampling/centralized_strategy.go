@@ -17,10 +17,13 @@ import (
 	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
-const defaultRule = "Default"
 const defaultInterval = int64(10)
-
 const manifestTTL = 3600 // Seconds
+
+type xrayAPI interface {
+	GetSamplingRulesPagesWithContext(aws.Context, *xraySvc.GetSamplingRulesInput, func(*xraySvc.GetSamplingRulesOutput, bool) bool, ...request.Option) error
+	GetSamplingTargetsWithContext(aws.Context, *xraySvc.GetSamplingTargetsInput, ...request.Option) (*xraySvc.GetSamplingTargetsOutput, error)
+}
 
 // CentralizedStrategy is an implementation of SamplingStrategy.
 type CentralizedStrategy struct {
@@ -28,7 +31,7 @@ type CentralizedStrategy struct {
 	fallback *LocalizedStrategy
 
 	// AWS X-Ray client
-	xray *xraySvc.XRay
+	xray xrayAPI
 
 	// Unique ID used by XRay service to identify this client
 	clientID string
@@ -70,6 +73,10 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 		clientID:     fmt.Sprintf("%x", r),
 		pollerCtx:    pollerCtx,
 		pollerCancel: pollerCancel,
+		manifest: &centralizedManifest{
+			Rules:  []*centralizedRule{},
+			Quotas: make(map[string]*centralizedQuota),
+		},
 	}, nil
 }
 
