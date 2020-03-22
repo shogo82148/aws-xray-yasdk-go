@@ -18,6 +18,10 @@ import (
 
 // TestDaemon is the mock server of AWS X-Ray daemon.
 type TestDaemon struct {
+	// ContextMissing is callback function for the context missing strategy.
+	// If it is nil, ignore context missing errors.
+	ContextMissing func(ctx context.Context, v interface{})
+
 	ch        <-chan *result
 	conn      net.PacketConn
 	ctx       context.Context
@@ -51,13 +55,25 @@ func NewTestDaemon(handler http.Handler) (context.Context, *TestDaemon) {
 		}
 		address += " tcp:" + u.Host
 	}
+
 	ctx = context.WithValue(ctx, clientContextKey, New(&Config{
-		DaemonAddress:    address,
-		SamplingStrategy: sampling.NewAllStrategy(),
+		DaemonAddress:      address,
+		SamplingStrategy:   sampling.NewAllStrategy(),
+		CtxmissingStrategy: &testDaemonContextMissing{td: d},
 	}))
 
 	go d.run(c)
 	return ctx, d
+}
+
+type testDaemonContextMissing struct {
+	td *TestDaemon
+}
+
+func (s *testDaemonContextMissing) ContextMissing(ctx context.Context, v interface{}) {
+	if s != nil && s.td != nil && s.td.ContextMissing != nil {
+		s.td.ContextMissing(ctx, v)
+	}
 }
 
 type result struct {

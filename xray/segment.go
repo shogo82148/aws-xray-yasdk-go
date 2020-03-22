@@ -233,6 +233,9 @@ func (err *errorPanic) Error() string {
 
 // Close closes the segment.
 func (seg *Segment) Close() {
+	if seg == nil {
+		return
+	}
 	if seg.parent != nil {
 		xraylog.Debugf(seg.ctx, "Closing subsegment named %s", seg.name)
 	} else {
