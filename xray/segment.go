@@ -517,7 +517,7 @@ func (seg *Segment) SetUser(user string) {
 	if seg == nil {
 		return
 	}
-	seg.mu.Unlock()
+	seg.mu.Lock()
 	defer seg.mu.Unlock()
 	seg.user = user
 }
