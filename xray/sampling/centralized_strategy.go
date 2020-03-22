@@ -255,7 +255,6 @@ func (s *CentralizedStrategy) refreshRule() {
 		RefreshedAt: time.Now(),
 	})
 	xraylog.Debug(ctx, "sampling rules are refreshed.")
-	return
 }
 
 func (s *CentralizedStrategy) refreshQuota() {
@@ -313,5 +312,4 @@ func (s *CentralizedStrategy) refreshQuota() {
 		xraylog.Debug(ctx, "chaning sampling rules is detected. refresh them.")
 		go s.refreshRule()
 	}
-	return
 }
