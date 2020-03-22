@@ -303,12 +303,12 @@ func (s *CentralizedStrategy) refreshQuota() {
 		}
 
 		for _, doc := range resp.SamplingTargetDocuments {
-			quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]
-			if !ok {
+			if quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]; ok {
+				quota.Update(doc)
+			} else {
 				// new rule may be added? try to refresh.
 				needRefresh = true
 			}
-			quota.Update(doc)
 		}
 		// check the rules are updated.
 		needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
