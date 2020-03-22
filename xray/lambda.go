@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"context"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 const (
 	lambdaInitializedDir  = "/tmp/.aws-xray"
 	lambdaInitializedFile = "initialized"
+	lambdaContextKey      = "x-amzn-trace-id"
 )
 
 func init() {
@@ -34,4 +36,26 @@ func init() {
 		log.Printf("failed to change times of %s: %v", name, err)
 		return
 	}
+}
+
+func beginSubsegmentForLambda(ctx context.Context, header, name string) (context.Context, *Segment) {
+	h := ParseTraceHeader(header)
+	h.SamplingDecision = SamplingDecisionSampled
+	if h.TraceID == "" {
+		h.TraceID = NewTraceID()
+	}
+
+	seg := &Segment{
+		ctx:           ctx,
+		name:          name, // TODO: @shogo82148 sanitize the name
+		id:            NewSegmentID(),
+		startTime:     nowFunc(),
+		totalSegments: 1,
+		sampled:       true,
+		traceID:       h.TraceID,
+		traceHeader:   h,
+	}
+	seg.root = seg
+	ctx = context.WithValue(ctx, segmentContextKey, seg)
+	return ctx, seg
 }

@@ -164,6 +164,12 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 	if h.TraceID == "" {
 		h.TraceID = NewTraceID()
 	}
+	if seg.sampled {
+		h.SamplingDecision = SamplingDecisionSampled
+	} else {
+		h.SamplingDecision = SamplingDecisionNotSampled
+	}
+
 	seg.traceID = h.TraceID
 	seg.traceHeader = h
 
@@ -179,6 +185,11 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 
 	value := ctx.Value(segmentContextKey)
 	if value == nil {
+		if header := ctx.Value(lambdaContextKey); header != nil {
+			// trace header comes from the AWS Lambda context.
+			return beginSubsegmentForLambda(ctx, header.(string), name)
+		}
+
 		client := defaultClient
 		if c := ctx.Value(clientContextKey); c != nil {
 			client = c.(*Client)
