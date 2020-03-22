@@ -20,6 +20,7 @@ func (k *contextKey) String() string { return "xray context value " + k.name }
 
 var loggerContextKey = &contextKey{"logger"}
 
+var mu sync.RWMutex
 var globalLogger Logger
 
 func init() {
@@ -74,6 +75,8 @@ func SetLogger(logger Logger) {
 	if logger == nil {
 		panic("logger should not be nil")
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	globalLogger = logger
 }
 
@@ -89,6 +92,8 @@ func ContextLogger(ctx context.Context) Logger {
 	if logger != nil {
 		return logger.(Logger)
 	}
+	mu.RLock()
+	defer mu.RUnlock()
 	return globalLogger
 }
 
