@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	xraySvc "github.com/aws/aws-sdk-go/service/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 const defaultInterval = int64(10)
@@ -166,9 +167,7 @@ func (s *CentralizedStrategy) rulePoller() {
 	jitter := int64(time.Second)
 
 	for {
-		if err := s.refreshRule(); err != nil {
-			// TODO: log error
-		}
+		s.refreshRule()
 
 		timer := time.NewTimer(interval + time.Duration(rnd.Int63n(jitter)))
 		select {
@@ -191,9 +190,7 @@ func (s *CentralizedStrategy) quotaPoller() {
 	jitter := int64(100 * time.Millisecond)
 
 	for {
-		if err := s.refreshQuota(); err != nil {
-			// TODO: log error
-		}
+		s.refreshQuota()
 
 		timer := time.NewTimer(interval + time.Duration(rnd.Int63n(jitter)))
 		select {
@@ -205,22 +202,22 @@ func (s *CentralizedStrategy) quotaPoller() {
 	}
 }
 
-func (s *CentralizedStrategy) refreshRule() (err error) {
-	defer func() {
-		// avoid propagating panics to the application code.
-		if e := recover(); e != nil {
-			err = fmt.Errorf("panic: %v", e)
-		}
-	}()
+func (s *CentralizedStrategy) refreshRule() {
 	ctx, cancel := context.WithTimeout(s.pollerCtx, time.Minute)
 	defer cancel()
 	s.muRefresh.Lock()
 	defer s.muRefresh.Unlock()
+	defer func() {
+		// avoid propagating panics to the application code.
+		if e := recover(); e != nil {
+			xraylog.Errorf(ctx, "panic: %v", e)
+		}
+	}()
 
 	manifest := s.getManifest()
 	rules := make([]*centralizedRule, 0, len(manifest.Rules))
 	quotas := make(map[string]*centralizedQuota, len(manifest.Rules))
-	err = s.xray.GetSamplingRulesPagesWithContext(ctx, &xraySvc.GetSamplingRulesInput{}, func(out *xraySvc.GetSamplingRulesOutput, lastPage bool) bool {
+	err := s.xray.GetSamplingRulesPagesWithContext(ctx, &xraySvc.GetSamplingRulesInput{}, func(out *xraySvc.GetSamplingRulesOutput, lastPage bool) bool {
 		for _, record := range out.SamplingRuleRecords {
 			r := record.SamplingRule
 			name := aws.StringValue(r.RuleName)
@@ -247,7 +244,8 @@ func (s *CentralizedStrategy) refreshRule() (err error) {
 		return true
 	})
 	if err != nil {
-		return err
+		xraylog.Errorf(ctx, "xray/sampling: failed to get sampling rules: %v", err)
+		return
 	}
 	sort.Stable(centralizedRuleSlice(rules))
 
@@ -256,20 +254,20 @@ func (s *CentralizedStrategy) refreshRule() (err error) {
 		Quotas:      quotas,
 		RefreshedAt: time.Now(),
 	})
-	return nil
+	xraylog.Debug(ctx, "sampling rules are refreshed.")
 }
 
-func (s *CentralizedStrategy) refreshQuota() (err error) {
-	defer func() {
-		// avoid propagating panics to the application code.
-		if e := recover(); e != nil {
-			err = fmt.Errorf("panic: %v", e)
-		}
-	}()
+func (s *CentralizedStrategy) refreshQuota() {
 	ctx, cancel := context.WithTimeout(s.pollerCtx, time.Minute)
 	defer cancel()
 	s.muRefresh.Lock()
 	defer s.muRefresh.Unlock()
+	defer func() {
+		// avoid propagating panics to the application code.
+		if e := recover(); e != nil {
+			xraylog.Errorf(ctx, "panic: %v", e)
+		}
+	}()
 
 	manifest := s.getManifest()
 	now := time.Now()
@@ -290,7 +288,7 @@ func (s *CentralizedStrategy) refreshQuota() (err error) {
 		SamplingStatisticsDocuments: stats,
 	})
 	if err != nil {
-		return err
+		return
 	}
 
 	needRefresh := false
@@ -303,17 +301,15 @@ func (s *CentralizedStrategy) refreshQuota() (err error) {
 		quota.Update(doc)
 	}
 
+	xraylog.Debug(ctx, "sampling targets are refreshed.")
+
 	// TODO update the interval.
 
 	// check the rules are updated.
 	needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
 
 	if needRefresh {
-		go func() {
-			if err := s.refreshRule(); err != nil {
-				// TODO: log err
-			}
-		}()
+		xraylog.Debug(ctx, "chaning sampling rules is detected. refresh them.")
+		go s.refreshRule()
 	}
-	return nil
 }
