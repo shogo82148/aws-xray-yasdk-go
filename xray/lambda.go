@@ -1,9 +1,14 @@
 package xray
 
-import "os"
+import (
+	"log"
+	"os"
+	"path/filepath"
+	"time"
+)
 
 const (
-	lambdaInitializedDir = "/tmp/.aws-xray"
+	lambdaInitializedDir  = "/tmp/.aws-xray"
 	lambdaInitializedFile = "initialized"
 )
 
