@@ -331,3 +331,31 @@ func TestDownstreamHeader_InheritUpstream(t *testing.T) {
 		t.Errorf("invalid additional data: want %s, got %s", "bar", h.AdditionalData["foo"])
 	}
 }
+
+func TestSegment_SetUser(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	ctx, seg := BeginSegment(ctx, "foobar")
+	SetUser(ctx, "@chooblarin")
+	seg.Close()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   seg.traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		User:      "@chooblarin",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
