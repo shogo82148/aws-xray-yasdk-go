@@ -17,9 +17,9 @@ type Config struct {
 	// The format is "address:port" or "tcp:address:port udp:address:port".
 	DaemonAddress string
 
-	StreamingStrategy  StreamingStrategy
-	SamplingStrategy   sampling.Strategy
-	CtxmissingStrategy ctxmissing.Strategy
+	StreamingStrategy      StreamingStrategy
+	SamplingStrategy       sampling.Strategy
+	ContextMissingStrategy ctxmissing.Strategy
 
 	// TODO: @shogo82148
 	// AWS_XRAY_TRACING_NAME

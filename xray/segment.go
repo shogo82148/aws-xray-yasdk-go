@@ -183,7 +183,7 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 		if c := ctx.Value(clientContextKey); c != nil {
 			client = c.(*Client)
 		}
-		client.ctxmissingStrategy.ContextMissing(ctx, "context missing for "+name)
+		client.contextMissingStrategy.ContextMissing(ctx, "context missing for "+name)
 		return ctx, nil
 	}
 	parent := value.(*Segment)

@@ -31,9 +31,9 @@ type Client struct {
 
 	pool sync.Pool
 
-	streamingStrategy  StreamingStrategy
-	samplingStrategy   sampling.Strategy
-	ctxmissingStrategy ctxmissing.Strategy
+	streamingStrategy      StreamingStrategy
+	samplingStrategy       sampling.Strategy
+	contextMissingStrategy ctxmissing.Strategy
 
 	mu   sync.Mutex
 	conn net.Conn
@@ -44,10 +44,10 @@ func New(config *Config) *Client {
 	// initialize sampling strategy
 	p := config.daemonEndpoints()
 	var samplingStrategy sampling.Strategy
-	var ctxmissingStrategy ctxmissing.Strategy
+	var contextMissingStrategy ctxmissing.Strategy
 	if config != nil {
 		samplingStrategy = config.SamplingStrategy
-		ctxmissingStrategy = config.CtxmissingStrategy
+		contextMissingStrategy = config.ContextMissingStrategy
 	}
 	if samplingStrategy == nil {
 		var err error
@@ -56,14 +56,14 @@ func New(config *Config) *Client {
 			panic(err)
 		}
 	}
-	if ctxmissingStrategy == nil {
+	if contextMissingStrategy == nil {
 		switch os.Getenv("AWS_XRAY_CONTEXT_MISSING") {
 		case "LOG_ERROR":
-			ctxmissingStrategy = &ctxmissing.LogErrorStrategy{}
+			contextMissingStrategy = &ctxmissing.LogErrorStrategy{}
 		case "RUNTIME_ERROR":
-			ctxmissingStrategy = &ctxmissing.RuntimeErrorStrategy{}
+			contextMissingStrategy = &ctxmissing.RuntimeErrorStrategy{}
 		default:
-			ctxmissingStrategy = &ctxmissing.LogErrorStrategy{}
+			contextMissingStrategy = &ctxmissing.LogErrorStrategy{}
 		}
 	}
 
@@ -80,9 +80,9 @@ func New(config *Config) *Client {
 				return new(bytes.Buffer)
 			},
 		},
-		streamingStrategy:  streamingStrategy,
-		samplingStrategy:   samplingStrategy,
-		ctxmissingStrategy: ctxmissingStrategy,
+		streamingStrategy:      streamingStrategy,
+		samplingStrategy:       samplingStrategy,
+		contextMissingStrategy: contextMissingStrategy,
 	}
 	return client
 }

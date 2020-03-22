@@ -57,9 +57,9 @@ func NewTestDaemon(handler http.Handler) (context.Context, *TestDaemon) {
 	}
 
 	ctx = context.WithValue(ctx, clientContextKey, New(&Config{
-		DaemonAddress:      address,
-		SamplingStrategy:   sampling.NewAllStrategy(),
-		CtxmissingStrategy: &testDaemonContextMissing{td: d},
+		DaemonAddress:          address,
+		SamplingStrategy:       sampling.NewAllStrategy(),
+		ContextMissingStrategy: &testDaemonContextMissing{td: d},
 	}))
 
 	go d.run(c)

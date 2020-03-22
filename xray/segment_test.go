@@ -184,7 +184,7 @@ func TestBeginSubsegment(t *testing.T) {
 	}
 }
 
-func TestBeginSubsegment_ctxmissing(t *testing.T) {
+func TestBeginSubsegment_contextMissing(t *testing.T) {
 	var ctxMissing interface{}
 
 	ctx, td := NewTestDaemon(nil)
