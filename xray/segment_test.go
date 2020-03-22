@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
@@ -180,6 +181,24 @@ func TestBeginSubsegment(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestBeginSubsegment_contextMissing(t *testing.T) {
+	var ctxMissing interface{}
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+	td.ContextMissing = func(ctx context.Context, v interface{}) {
+		ctxMissing = v
+	}
+
+	ctx, seg := BeginSubsegment(ctx, "subsegment")
+	_ = ctx // do something using ctx
+	seg.Close()
+
+	if ctxMissing == nil {
+		t.Error("want not nil, got nil")
 	}
 }
 

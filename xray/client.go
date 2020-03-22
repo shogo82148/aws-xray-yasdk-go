@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"os"
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/ctxmissing"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
@@ -29,8 +31,9 @@ type Client struct {
 
 	pool sync.Pool
 
-	streamingStrategy StreamingStrategy
-	samplingStrategy  sampling.Strategy
+	streamingStrategy      StreamingStrategy
+	samplingStrategy       sampling.Strategy
+	contextMissingStrategy ctxmissing.Strategy
 
 	mu   sync.Mutex
 	conn net.Conn
@@ -41,14 +44,26 @@ func New(config *Config) *Client {
 	// initialize sampling strategy
 	p := config.daemonEndpoints()
 	var samplingStrategy sampling.Strategy
+	var contextMissingStrategy ctxmissing.Strategy
 	if config != nil {
 		samplingStrategy = config.SamplingStrategy
+		contextMissingStrategy = config.ContextMissingStrategy
 	}
 	if samplingStrategy == nil {
 		var err error
 		samplingStrategy, err = sampling.NewCentralizedStrategy(p.TCP, nil)
 		if err != nil {
 			panic(err)
+		}
+	}
+	if contextMissingStrategy == nil {
+		switch os.Getenv("AWS_XRAY_CONTEXT_MISSING") {
+		case "LOG_ERROR":
+			contextMissingStrategy = &ctxmissing.LogErrorStrategy{}
+		case "RUNTIME_ERROR":
+			contextMissingStrategy = &ctxmissing.RuntimeErrorStrategy{}
+		default:
+			contextMissingStrategy = &ctxmissing.LogErrorStrategy{}
 		}
 	}
 
@@ -65,8 +80,9 @@ func New(config *Config) *Client {
 				return new(bytes.Buffer)
 			},
 		},
-		streamingStrategy: streamingStrategy,
-		samplingStrategy:  samplingStrategy,
+		streamingStrategy:      streamingStrategy,
+		samplingStrategy:       samplingStrategy,
+		contextMissingStrategy: contextMissingStrategy,
 	}
 	return client
 }

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/ctxmissing"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 )
 
@@ -16,12 +17,12 @@ type Config struct {
 	// The format is "address:port" or "tcp:address:port udp:address:port".
 	DaemonAddress string
 
-	StreamingStrategy StreamingStrategy
-	SamplingStrategy  sampling.Strategy
+	StreamingStrategy      StreamingStrategy
+	SamplingStrategy       sampling.Strategy
+	ContextMissingStrategy ctxmissing.Strategy
 
 	// TODO: @shogo82148
 	// AWS_XRAY_TRACING_NAME
-	// AWS_XRAY_CONTEXT_MISSING
 }
 
 type daemonEndpoints struct {

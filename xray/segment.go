@@ -101,7 +101,11 @@ func NewSegmentID() string {
 
 // ContextSegment return the segment of current context.
 func ContextSegment(ctx context.Context) *Segment {
-	return ctx.Value(segmentContextKey).(*Segment)
+	seg := ctx.Value(segmentContextKey)
+	if seg == nil {
+		return nil
+	}
+	return seg.(*Segment)
 }
 
 // WithSegment returns a new context with the existing segment.
@@ -172,10 +176,21 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 // Caller should close the segment when the work is done.
 func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segment) {
 	now := nowFunc()
-	parent := ctx.Value(segmentContextKey).(*Segment)
-	if parent == nil {
-		panic("CONTEXT MISSING!") // TODO: see AWS_XRAY_CONTEXT_MISSING
+
+	value := ctx.Value(segmentContextKey)
+	if value == nil {
+		client := defaultClient
+		if c := ctx.Value(clientContextKey); c != nil {
+			client = c.(*Client)
+		}
+		client.contextMissingStrategy.ContextMissing(ctx, "context missing for "+name)
+		return ctx, nil
 	}
+	parent := value.(*Segment)
+	if parent == nil {
+		return ctx, nil
+	}
+
 	root := parent.root
 	seg := &Segment{
 		ctx:       ctx,
@@ -218,6 +233,9 @@ func (err *errorPanic) Error() string {
 
 // Close closes the segment.
 func (seg *Segment) Close() {
+	if seg == nil {
+		return
+	}
 	if seg.parent != nil {
 		xraylog.Debugf(seg.ctx, "Closing subsegment named %s", seg.name)
 	} else {
