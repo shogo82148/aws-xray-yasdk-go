@@ -74,6 +74,7 @@ type Segment struct {
 	cause    *schema.Cause
 
 	namespace string
+	user      string
 	metadata  map[string]interface{}
 	sql       *schema.SQL
 	http      *schema.HTTP
@@ -509,4 +510,19 @@ func (seg *Segment) SetHTTPResponse(response *schema.HTTPResponse) {
 // SetHTTPResponse sets the information of HTTP requests.
 func SetHTTPResponse(ctx context.Context, response *schema.HTTPResponse) {
 	ContextSegment(ctx).SetHTTPResponse(response)
+}
+
+// SetUser sets a user id.
+func (seg *Segment) SetUser(user string) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Unlock()
+	defer seg.mu.Unlock()
+	seg.user = user
+}
+
+// SetUser sets a user id.
+func SetUser(ctx context.Context, user string) {
+	ContextSegment(ctx).SetUser(user)
 }
