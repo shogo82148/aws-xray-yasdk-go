@@ -18,9 +18,7 @@ type contextKey struct {
 
 func (k *contextKey) String() string { return "xray context value " + k.name }
 
-var (
-	loggerContextKey = &contextKey{"logger"}
-)
+var loggerContextKey = &contextKey{"logger"}
 
 var globalLogger Logger
 
