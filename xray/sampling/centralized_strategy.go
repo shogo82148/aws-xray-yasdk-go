@@ -258,6 +258,9 @@ func (s *CentralizedStrategy) refreshRule() {
 }
 
 func (s *CentralizedStrategy) refreshQuota() {
+	// maximum number of targets of GetSamplingTargets API
+	const maxTargets = 25
+
 	ctx, cancel := context.WithTimeout(s.pollerCtx, time.Minute)
 	defer cancel()
 	s.muRefresh.Lock()
@@ -284,29 +287,36 @@ func (s *CentralizedStrategy) refreshQuota() {
 		})
 	}
 
-	resp, err := s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
-		SamplingStatisticsDocuments: stats,
-	})
-	if err != nil {
-		return
-	}
-
-	needRefresh := false
-	for _, doc := range resp.SamplingTargetDocuments {
-		quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]
-		if !ok {
-			// new rule may be added? try to refresh.
-			needRefresh = true
+	var needRefresh bool
+	for len(stats) > 0 {
+		l := len(stats)
+		if l > maxTargets {
+			l = maxTargets
 		}
-		quota.Update(doc)
+		resp, err := s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
+			SamplingStatisticsDocuments: stats[:l],
+		})
+		stats = stats[l:]
+		if err != nil {
+			xraylog.Errorf(ctx, "failed to refresh sampling targets: %v", err)
+			continue
+		}
+
+		for _, doc := range resp.SamplingTargetDocuments {
+			quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]
+			if !ok {
+				// new rule may be added? try to refresh.
+				needRefresh = true
+			}
+			quota.Update(doc)
+		}
+		// check the rules are updated.
+		needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
 	}
 
 	xraylog.Debug(ctx, "sampling targets are refreshed.")
 
 	// TODO update the interval.
-
-	// check the rules are updated.
-	needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
 
 	if needRefresh {
 		xraylog.Debug(ctx, "chaning sampling rules is detected. refresh them.")
