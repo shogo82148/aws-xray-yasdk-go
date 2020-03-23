@@ -91,6 +91,9 @@ type Segment struct {
 type Service struct {
 	// Version is a string that identifies the version of your application that served the request.
 	Version string `json:"version,omitempty"`
+
+	Compiler        string `json:"compiler,omitempty"`
+	CompilerVersion string `json:"compiler_version,omitempty"`
 }
 
 // HTTP is information about the original HTTP request.

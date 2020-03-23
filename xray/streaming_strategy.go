@@ -63,6 +63,7 @@ func serialize(seg *Segment) *schema.Segment {
 			ret.ParentID = parentID
 			ret.Type = "subsegment"
 		}
+		ret.Service = ServiceData
 	}
 
 	for _, sub := range seg.subsegments {
@@ -119,6 +120,7 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 	}
 
 	if seg.isRoot() {
+		ret.Service = ServiceData
 		if parentID := seg.traceHeader.ParentID; parentID != "" {
 			// the parent is on upstream
 			ret.ParentID = parentID

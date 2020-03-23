@@ -116,6 +116,7 @@ func TestClient(t *testing.T) {
 				},
 			},
 		},
+		Service: xray.ServiceData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -232,6 +233,7 @@ func TestClient_TLS(t *testing.T) {
 				},
 			},
 		},
+		Service: xray.ServiceData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -347,6 +349,7 @@ func TestClient_DNS(t *testing.T) {
 				},
 			},
 		},
+		Service: xray.ServiceData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		dns["addresses"] = []interface{}{"::1", addr} // addresses may contains IPv6
