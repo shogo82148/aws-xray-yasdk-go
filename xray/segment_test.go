@@ -359,3 +359,41 @@ func TestSegment_SetUser(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestSegment_AddAnnotation(t *testing.T) {
+	nowFunc = fixedTime
+	defer func() { nowFunc = time.Now }()
+
+	ctx, td := NewTestDaemon(nil)
+	defer td.Close()
+
+	ctx, seg := BeginSegment(ctx, "foobar")
+	AddAnnotationBool(ctx, "boolean", true)
+	AddAnnotationInt64(ctx, "int64", -42)
+	AddAnnotationUint64(ctx, "uint64", 42)
+	AddAnnotationFloat64(ctx, "float64", 3.14)
+	AddAnnotationString(ctx, "string", "@chooblarin")
+	seg.Close()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Error(err)
+	}
+	want := &schema.Segment{
+		Name:      "foobar",
+		ID:        seg.id,
+		TraceID:   seg.traceID,
+		StartTime: 1000000000,
+		EndTime:   1000000000,
+		Annotations: map[string]interface{}{
+			"boolean": true,
+			"int64":   -42.0,
+			"uint64":  42.0,
+			"float64": 3.14,
+			"string":  "@chooblarin",
+		},
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}

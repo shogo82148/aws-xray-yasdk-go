@@ -38,11 +38,12 @@ func serialize(seg *Segment) *schema.Segment {
 		Fault:    seg.fault,
 		Cause:    seg.cause,
 
-		Namespace: seg.namespace,
-		User:      seg.user,
-		Metadata:  seg.metadata,
-		SQL:       seg.sql,
-		HTTP:      seg.http,
+		Namespace:   seg.namespace,
+		User:        seg.user,
+		Metadata:    seg.metadata,
+		Annotations: seg.annotations,
+		SQL:         seg.sql,
+		HTTP:        seg.http,
 	}
 
 	if seg.inProgress() {
@@ -101,11 +102,12 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 		Fault:    seg.fault,
 		Cause:    seg.cause,
 
-		Namespace: seg.namespace,
-		User:      seg.user,
-		Metadata:  seg.metadata,
-		SQL:       seg.sql,
-		HTTP:      seg.http,
+		Namespace:   seg.namespace,
+		User:        seg.user,
+		Metadata:    seg.metadata,
+		Annotations: seg.annotations,
+		SQL:         seg.sql,
+		HTTP:        seg.http,
 	}
 
 	if seg.inProgress() {
