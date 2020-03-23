@@ -235,6 +235,7 @@ func (s *CentralizedStrategy) refreshRule() {
 				ruleName:    name,
 				priority:    aws.Int64Value(r.Priority),
 				host:        aws.StringValue(r.Host),
+				urlPath:     aws.StringValue(r.URLPath),
 				httpMethod:  aws.StringValue(r.HTTPMethod),
 				serviceName: aws.StringValue(r.ServiceName),
 				serviceType: aws.StringValue(r.ServiceType),
