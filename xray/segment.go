@@ -73,11 +73,12 @@ type Segment struct {
 	fault    bool
 	cause    *schema.Cause
 
-	namespace string
-	user      string
-	metadata  map[string]interface{}
-	sql       *schema.SQL
-	http      *schema.HTTP
+	namespace   string
+	user        string
+	metadata    map[string]interface{}
+	annotations map[string]interface{}
+	sql         *schema.SQL
+	http        *schema.HTTP
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -525,4 +526,66 @@ func (seg *Segment) SetUser(user string) {
 // SetUser sets a user id.
 func SetUser(ctx context.Context, user string) {
 	ContextSegment(ctx).SetUser(user)
+}
+
+func (seg *Segment) addAnnotation(key string, value interface{}) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	if seg.annotations == nil {
+		seg.annotations = make(map[string]interface{})
+	}
+	seg.annotations[key] = value
+}
+
+// AddAnnotationBool adds a boolean type annotation.
+func (seg *Segment) AddAnnotationBool(key string, value bool) {
+	seg.addAnnotation(key, value)
+}
+
+// AddAnnotationBool adds a boolean type annotation.
+func AddAnnotationBool(ctx context.Context, key string, value bool) {
+	ContextSegment(ctx).addAnnotation(key, value)
+}
+
+// AddAnnotationString adds a string type annotation.
+func (seg *Segment) AddAnnotationString(key, value string) {
+	seg.addAnnotation(key, value)
+}
+
+// AddAnnotationString adds a string type annotation.
+func AddAnnotationString(ctx context.Context, key, value string) {
+	ContextSegment(ctx).addAnnotation(key, value)
+}
+
+// AddAnnotationInt64 adds a 64 bit integer type annotation.
+func (seg *Segment) AddAnnotationInt64(key string, value int64) {
+	seg.addAnnotation(key, value)
+}
+
+// AddAnnotationInt64 adds a 64 bit integer type annotation.
+func AddAnnotationInt64(ctx context.Context, key string, value int64) {
+	ContextSegment(ctx).addAnnotation(key, value)
+}
+
+// AddAnnotationUint64 adds a 64 bit integer type annotation.
+func (seg *Segment) AddAnnotationUint64(key string, value uint64) {
+	seg.addAnnotation(key, value)
+}
+
+// AddAnnotationUint64 adds a 64 bit integer type annotation.
+func AddAnnotationUint64(ctx context.Context, key string, value uint64) {
+	ContextSegment(ctx).addAnnotation(key, value)
+}
+
+// AddAnnotationFloat64 adds a 64 bit integer type annotation.
+func (seg *Segment) AddAnnotationFloat64(key string, value float64) {
+	seg.addAnnotation(key, value)
+}
+
+// AddAnnotationFloat64 adds a 64 bit integer type annotation.
+func AddAnnotationFloat64(ctx context.Context, key string, value float64) {
+	ContextSegment(ctx).addAnnotation(key, value)
 }
