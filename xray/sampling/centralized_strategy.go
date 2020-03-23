@@ -122,13 +122,13 @@ func (s *CentralizedStrategy) Close() {
 func (s *CentralizedStrategy) ShouldTrace(req *Request) *Decision {
 	s.startOnce.Do(s.start)
 	manifest := s.getManifest()
-
 	if manifest == nil {
 		return s.fallback.ShouldTrace(req)
 	}
 
 	for _, r := range manifest.Rules {
 		if r.Match(req) {
+			xraylog.Debugf(context.Background(), "ShouldTrace Match: rule %s", r.ruleName)
 			return r.Sample()
 		}
 	}
@@ -214,6 +214,7 @@ func (s *CentralizedStrategy) refreshRule() {
 		}
 	}()
 
+	xraylog.Debug(ctx, "start refreshing sampling rules")
 	manifest := s.getManifest()
 	rules := make([]*centralizedRule, 0, len(manifest.Rules))
 	quotas := make(map[string]*centralizedQuota, len(manifest.Rules))
@@ -240,6 +241,12 @@ func (s *CentralizedStrategy) refreshRule() {
 			}
 			rules = append(rules, rule)
 			quotas[name] = quota
+			xraylog.Debugf(
+				ctx,
+				"Refresh Sampling Rule: Name: %s, Priority: %d, FixedRate: %f, Host: %s, Method: %s, ServiceName: %s, ServiceType: %s",
+				name, aws.Int64Value(r.Priority), aws.Float64Value(r.FixedRate),
+				aws.StringValue(r.Host), aws.StringValue(r.HTTPMethod), aws.StringValue(r.ServiceName), aws.StringValue(r.ServiceType),
+			)
 		}
 		return true
 	})
@@ -285,6 +292,10 @@ func (s *CentralizedStrategy) refreshQuota() {
 			BorrowCount:  &stat.borrowed,
 			Timestamp:    &now,
 		})
+		xraylog.Debugf(
+			ctx,
+			"Sampling Statistics: Name: %s, Requests: %d, Borrowed: %d, Sampled: %d", r.ruleName, stat.requests, stat.borrowed, stat.sampled,
+		)
 	}
 
 	var needRefresh bool
@@ -301,10 +312,14 @@ func (s *CentralizedStrategy) refreshQuota() {
 			xraylog.Errorf(ctx, "failed to refresh sampling targets: %v", err)
 			continue
 		}
-
 		for _, doc := range resp.SamplingTargetDocuments {
 			if quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]; ok {
 				quota.Update(doc)
+				xraylog.Debugf(
+					ctx,
+					"Refresh Quota: Name: %s, Quota: %d, TTL: %s, Interval: %d",
+					aws.StringValue(doc.RuleName), aws.Int64Value(doc.ReservoirQuota), doc.ReservoirQuotaTTL, aws.Int64Value(doc.Interval),
+				)
 			} else {
 				// new rule may be added? try to refresh.
 				needRefresh = true
