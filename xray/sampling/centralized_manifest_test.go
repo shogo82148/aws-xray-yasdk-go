@@ -10,6 +10,52 @@ import (
 	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
+func TestCentralizedRule_Match(t *testing.T) {
+	tc := []struct {
+		req  *Request
+		rule *centralizedRule
+		want bool
+	}{
+		{
+			req: nil,
+			rule: &centralizedRule{
+				ruleName: "nil Request",
+			},
+			want: true,
+		},
+		{
+			req: &Request{},
+			rule: &centralizedRule{
+				ruleName: "zero Request",
+			},
+			want: true,
+		},
+		{
+			req: &Request{
+				Host:        "localhost:8080",
+				Method:      "GET",
+				URL:         "/",
+				ServiceName: "",
+				ServiceType: "",
+			},
+			rule: &centralizedRule{
+				ruleName:    "default",
+				host:        "*",
+				httpMethod:  "*",
+				urlPath:     "*",
+				serviceName: "*",
+				serviceType: "*",
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tc {
+		if tt.rule.Match(tt.req) != tt.want {
+			t.Errorf("%s: want %t, got %t", tt.rule.ruleName, tt.want, !tt.want)
+		}
+	}
+}
+
 func TestCentralizedQuota_Sample(t *testing.T) {
 	var random float64 = 1
 	var now int64 = 1000000000 // unix epoch
