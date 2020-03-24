@@ -36,6 +36,30 @@ const (
 	segmentStatusEmitted
 )
 
+// Given several enabled plugins, the recorder should resolve a single one that's most representative of this environment
+// Resolution order: EB > EKS > ECS > EC2
+// EKS > ECS because the ECS plugin checks for an environment variable whereas the EKS plugin checks for a kubernetes authentication file, which is a stronger enable condition
+var originPriority = map[string]int{
+	schema.OriginElasticBeanstalk: 0,
+	schema.OriginEKSContainer:     1,
+	schema.OriginECSContainer:     2,
+	schema.OriginEC2Instance:      3,
+}
+
+func origin() string {
+	var org string
+	priority := -1
+	for _, p := range getPlugins() {
+		if o := p.Origin(); o != "" {
+			p, ok := originPriority[o]
+			if !ok || p > priority {
+				org = o
+			}
+		}
+	}
+	return org
+}
+
 // Segment is a segment.
 type Segment struct {
 	mu        sync.RWMutex
@@ -78,6 +102,7 @@ type Segment struct {
 
 	namespace   string
 	user        string
+	origin      string
 	metadata    map[string]interface{}
 	annotations map[string]interface{}
 	sql         *schema.SQL
@@ -135,6 +160,7 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 		id:            NewSegmentID(),
 		startTime:     nowFunc(),
 		totalSegments: 1,
+		origin:        origin(),
 	}
 	seg.root = seg
 
@@ -151,11 +177,11 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 		default:
 			client := seg.client()
 			sd := client.samplingStrategy.ShouldTrace(&sampling.Request{
-				Host:   r.Host,
-				URL:    r.URL.Path,
-				Method: r.Method,
-				// TODO: ServiceName
-				// TODO: ServiceType
+				Host:        r.Host,
+				URL:         r.URL.Path,
+				Method:      r.Method,
+				ServiceName: seg.name,
+				ServiceType: seg.origin,
 			})
 			seg.sampled = sd.Sample
 			if sd.Rule != nil {
