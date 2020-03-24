@@ -63,7 +63,16 @@ func serialize(seg *Segment) *schema.Segment {
 			ret.ParentID = parentID
 			ret.Type = "subsegment"
 		}
+
+		// inject the service information
 		ret.Service = ServiceData
+		aws := *AWSData
+		aws.XRay = &schema.XRay{
+			Version:  Version,
+			Type:     Type,
+			RuleName: seg.ruleName,
+		}
+		ret.AWS = &aws
 	}
 
 	for _, sub := range seg.subsegments {
@@ -120,7 +129,16 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 	}
 
 	if seg.isRoot() {
+		// inject the service information
 		ret.Service = ServiceData
+		aws := *AWSData
+		aws.XRay = &schema.XRay{
+			Version:  Version,
+			Type:     Type,
+			RuleName: seg.ruleName,
+		}
+		ret.AWS = &aws
+
 		if parentID := seg.traceHeader.ParentID; parentID != "" {
 			// the parent is on upstream
 			ret.ParentID = parentID

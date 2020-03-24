@@ -145,6 +145,9 @@ type AWS struct {
 	// Information about an EC2 instance.
 	EC2 *EC2 `json:"ec2,omitempty"`
 
+	// Information about X-Ray SDK.
+	XRay *XRay `json:"xray,omitempty"`
+
 	// Information about an Elastic Beanstalk environment.
 	ElasticBeanstalk *ElasticBeanstalk `json:"elastic_beanstalk,omitempty"`
 
@@ -177,6 +180,13 @@ type EC2 struct {
 
 	// The Availability Zone in which the instance is running.
 	AvailabilityZone string `json:"availability_zone,omitempty"`
+}
+
+// XRay is information about X-Ray SDK.
+type XRay struct {
+	Version  string `json:"sdk_version,omitempty"`
+	Type     string `json:"sdk,omitempty"`
+	RuleName string `json:"sampling_rule_name,omitempty"`
 }
 
 // ElasticBeanstalk is information about an Elastic Beanstalk environment.

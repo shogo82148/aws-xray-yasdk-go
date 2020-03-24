@@ -46,7 +46,10 @@ type Segment struct {
 	startTime time.Time
 	endTime   time.Time
 	status    segmentStatus
-	sampled   bool
+
+	// result of sampling
+	sampled  bool
+	ruleName string
 
 	// parent segment
 	// if the segment is the root, the parent is nil.
@@ -155,12 +158,18 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 				// TODO: ServiceType
 			})
 			seg.sampled = sd.Sample
+			if sd.Rule != nil {
+				seg.ruleName = *sd.Rule
+			}
 			xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 		}
 	} else {
 		client := seg.client()
 		sd := client.samplingStrategy.ShouldTrace(nil)
 		seg.sampled = sd.Sample
+		if sd.Rule != nil {
+			seg.ruleName = *sd.Rule
+		}
 		xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 	}
 	if h.TraceID == "" {

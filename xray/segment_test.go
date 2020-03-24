@@ -53,6 +53,12 @@ func TestBeginSegment(t *testing.T) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -88,6 +94,12 @@ func TestBeginSegmentWithRequest(t *testing.T) {
 		ParentID:  "03babb4ba280be51",
 		Type:      "subsegment",
 		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -144,6 +156,12 @@ func TestBeginSegmentWithRequest_Sampled(t *testing.T) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -182,6 +200,12 @@ func TestBeginSubsegment(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -253,6 +277,12 @@ func TestSegmentPanic(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -294,6 +324,12 @@ func TestAddError(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -400,6 +436,12 @@ func TestSegment_AddAnnotation(t *testing.T) {
 			"string":  "@chooblarin",
 		},
 		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

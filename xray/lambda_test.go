@@ -34,6 +34,12 @@ func TestBeginSubsegment_ForLambda(t *testing.T) {
 		ParentID:  "03babb4ba280be51",
 		Type:      "subsegment",
 		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
