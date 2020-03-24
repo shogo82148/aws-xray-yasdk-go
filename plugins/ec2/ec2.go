@@ -4,6 +4,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
 
 type ec2plugin struct {
@@ -30,7 +31,7 @@ func Init() {
 }
 
 // HandleSegment implements Plugin.
-func (p *ec2plugin) HandleSegment(seg *Segment, doc *schema.Segment) {
+func (p *ec2plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
 		doc.AWS = &schema.AWS{}
 	}
@@ -38,4 +39,4 @@ func (p *ec2plugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 }
 
 // Origin implements Plugin.
-func (xrayPlugin) Origin() string { return schema.OriginEC2Instance }
+func (*ec2plugin) Origin() string { return schema.OriginEC2Instance }
