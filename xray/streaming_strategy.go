@@ -66,19 +66,18 @@ func serialize(seg *Segment) *schema.Segment {
 
 		// inject the service information
 		ret.Service = ServiceData
-		aws := *AWSData
-		aws.XRay = &schema.XRay{
-			Version:  Version,
-			Type:     Type,
-			RuleName: seg.ruleName,
-		}
-		ret.AWS = &aws
 	}
 
 	for _, sub := range seg.subsegments {
 		sub.mu.Lock()
 		ret.Subsegments = append(ret.Subsegments, serialize(sub))
 		sub.mu.Unlock()
+	}
+
+	if seg.isRoot() {
+		for _, p := range getPlugins() {
+			p.HandleSegment(seg, ret)
+		}
 	}
 
 	return ret
@@ -131,18 +130,14 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 	if seg.isRoot() {
 		// inject the service information
 		ret.Service = ServiceData
-		aws := *AWSData
-		aws.XRay = &schema.XRay{
-			Version:  Version,
-			Type:     Type,
-			RuleName: seg.ruleName,
-		}
-		ret.AWS = &aws
 
 		if parentID := seg.traceHeader.ParentID; parentID != "" {
 			// the parent is on upstream
 			ret.ParentID = parentID
 			ret.Type = "subsegment"
+		}
+		for _, p := range getPlugins() {
+			p.HandleSegment(seg, ret)
 		}
 	} else {
 		ret.ParentID = seg.parent.id
