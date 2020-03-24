@@ -80,6 +80,12 @@ func (segs *httpSubsegments) DNSDone(info httptrace.DNSDoneInfo) {
 	segs.dnsSeg.AddError(info.Err)
 	segs.dnsSeg.Close()
 	segs.dnsCtx, segs.dnsSeg = nil, nil
+
+	if info.Err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func (segs *httpSubsegments) ConnectStart(network, addr string) {

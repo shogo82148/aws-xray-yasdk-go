@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -23,6 +24,11 @@ func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out.StartTime = 0
 	out.EndTime = 0
 	out.Subsegments = nil
+	if out.Cause != nil {
+		for i := range out.Cause.Exceptions {
+			out.Cause.Exceptions[i].ID = ""
+		}
+	}
 	for _, sub := range in.Subsegments {
 		out.Subsegments = append(out.Subsegments, ignoreVariableFieldFunc(sub))
 	}
@@ -374,5 +380,100 @@ func TestClient_DNS(t *testing.T) {
 		if diff2 := cmp.Diff(want, got, ignoreVariableField); diff2 != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
 		}
+	}
+}
+
+func TestClient_InvalidDomain(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	func() {
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		req, err := http.NewRequest(http.MethodGet, "https://domain.invalid", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		resp, err := client.Do(req)
+		if err != nil {
+			return
+		}
+		defer resp.Body.Close()
+		t.Fatal("want error, but not")
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "domain.invalid",
+				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    "https://domain.invalid",
+					},
+				},
+				Fault: true,
+				Cause: &schema.Cause{
+					WorkingDirectory: wd,
+					Exceptions: []schema.Exception{
+						{
+							Message: "dial tcp: lookup domain.invalid: no such host",
+							Type:    "*net.OpError",
+						},
+					},
+				},
+				Subsegments: []*schema.Segment{
+					{
+						Name:  "connect",
+						Fault: true,
+						Subsegments: []*schema.Segment{
+							{
+								Name:  "dns",
+								Fault: true,
+								Cause: &schema.Cause{
+									WorkingDirectory: wd,
+									Exceptions: []schema.Exception{
+										{
+											Message: "lookup domain.invalid: no such host",
+											Type:    "*net.DNSError",
+										},
+									},
+								},
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dns": map[string]interface{}{
+											"addresses": []interface{}{},
+											"coalesced": false,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
