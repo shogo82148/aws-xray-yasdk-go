@@ -70,6 +70,7 @@ func TestStreamingStrategyBatchAll(t *testing.T) {
 			TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
 			StartTime: 1000000000,
 			EndTime:   1000000001,
+			Service:   ServiceData,
 			Subsegments: []*schema.Segment{
 				{
 					Name:      "child1",
@@ -175,6 +176,7 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 				TraceID:    "1-5e645f3e-1dfad076a177c5ccc5de12f5",
 				StartTime:  1000000000,
 				InProgress: true,
+				Service:    ServiceData,
 				Subsegments: []*schema.Segment{
 					{
 						Name:      "child1",

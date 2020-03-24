@@ -30,6 +30,7 @@ func TestCapture(t *testing.T) {
 				Name: "capture",
 			},
 		},
+		Service: ServiceData,
 	}
 	got, err := td.Recv()
 	if err != nil {

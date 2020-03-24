@@ -33,6 +33,7 @@ func TestBeginSubsegment_ForLambda(t *testing.T) {
 		EndTime:   1000000000,
 		ParentID:  "03babb4ba280be51",
 		Type:      "subsegment",
+		Service:   ServiceData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

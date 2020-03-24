@@ -179,7 +179,6 @@ func TestBeginSubsegment(t *testing.T) {
 				ID:        seg.id,
 				StartTime: 1000000000,
 				EndTime:   1000000000,
-				Service:   ServiceData,
 			},
 		},
 		Service: ServiceData,
