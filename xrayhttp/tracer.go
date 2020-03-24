@@ -114,6 +114,12 @@ func (segs *httpSubsegments) ConnectDone(network, addr string, err error) {
 	segs.dialSeg.AddError(err)
 	segs.dialSeg.Close()
 	segs.dialCtx, segs.dialSeg = nil, nil
+
+	if err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func (segs *httpSubsegments) TLSHandshakeStart() {

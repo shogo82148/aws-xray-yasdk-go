@@ -489,3 +489,112 @@ func TestClient_InvalidDomain(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestClient_InvalidAddress(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	var httpErr error
+	func() {
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+
+		// we expected no Gopher daemon on this computer ʕ◔ϖ◔ʔ
+		req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:70", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		resp, err := client.Do(req)
+		if err != nil {
+			httpErr = err
+			return
+		}
+		defer resp.Body.Close()
+		t.Fatal("want error, but not")
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	urlErr, ok := httpErr.(*url.Error)
+	if !ok {
+		t.Fatal(httpErr)
+	}
+	opErr, ok := urlErr.Err.(*net.OpError)
+	if !ok {
+		t.Fatal(urlErr)
+	}
+
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "127.0.0.1:70",
+				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    "http://127.0.0.1:70",
+					},
+				},
+				Fault: true,
+				Cause: &schema.Cause{
+					WorkingDirectory: wd,
+					Exceptions: []schema.Exception{
+						{
+							Message: opErr.Error(),
+							Type:    "*net.OpError",
+						},
+					},
+				},
+				Subsegments: []*schema.Segment{
+					{
+						Name:  "connect",
+						Fault: true,
+						Subsegments: []*schema.Segment{
+							{
+								Name:  "dial",
+								Fault: true,
+								Cause: &schema.Cause{
+									WorkingDirectory: wd,
+									Exceptions: []schema.Exception{
+										{
+											Message: opErr.Error(),
+											Type:    "*net.OpError",
+										},
+									},
+								},
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"address": "127.0.0.1:70",
+											"network": "tcp",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
