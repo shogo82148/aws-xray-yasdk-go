@@ -52,6 +52,13 @@ func TestBeginSegment(t *testing.T) {
 		TraceID:   seg.traceID,
 		StartTime: 1000000000,
 		EndTime:   1000000000,
+		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -86,6 +93,13 @@ func TestBeginSegmentWithRequest(t *testing.T) {
 		EndTime:   1000000000,
 		ParentID:  "03babb4ba280be51",
 		Type:      "subsegment",
+		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -141,6 +155,13 @@ func TestBeginSegmentWithRequest_Sampled(t *testing.T) {
 		TraceID:   "1-5e645f3e-1dfad076a177c5ccc5de12f5",
 		StartTime: 1000000000,
 		EndTime:   1000000000,
+		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -176,6 +197,13 @@ func TestBeginSubsegment(t *testing.T) {
 				ID:        seg.id,
 				StartTime: 1000000000,
 				EndTime:   1000000000,
+			},
+		},
+		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
 			},
 		},
 	}
@@ -248,6 +276,13 @@ func TestSegmentPanic(t *testing.T) {
 				},
 			},
 		},
+		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -286,6 +321,13 @@ func TestAddError(t *testing.T) {
 					Message: "some error",
 					Type:    "*errors.errorString",
 				},
+			},
+		},
+		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
 			},
 		},
 	}
@@ -354,6 +396,13 @@ func TestSegment_SetUser(t *testing.T) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		User:      "@chooblarin",
+		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -391,6 +440,13 @@ func TestSegment_AddAnnotation(t *testing.T) {
 			"uint64":  42.0,
 			"float64": 3.14,
 			"string":  "@chooblarin",
+		},
+		Service: ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
 		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {

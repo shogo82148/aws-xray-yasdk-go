@@ -116,6 +116,13 @@ func TestClient(t *testing.T) {
 				},
 			},
 		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -232,6 +239,13 @@ func TestClient_TLS(t *testing.T) {
 				},
 			},
 		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -345,6 +359,13 @@ func TestClient_DNS(t *testing.T) {
 					},
 					{Name: "request"},
 				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
 			},
 		},
 	}
