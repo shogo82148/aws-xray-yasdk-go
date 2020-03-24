@@ -387,6 +387,7 @@ func TestClient_InvalidDomain(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
 
+	var httpErr error
 	func() {
 		client := Client(nil)
 		ctx, root := xray.BeginSegment(ctx, "test")
@@ -398,6 +399,7 @@ func TestClient_InvalidDomain(t *testing.T) {
 		req = req.WithContext(ctx)
 		resp, err := client.Do(req)
 		if err != nil {
+			httpErr = err
 			return
 		}
 		defer resp.Body.Close()
@@ -412,6 +414,16 @@ func TestClient_InvalidDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	urlErr, ok := httpErr.(*url.Error)
+	if !ok {
+		t.Fatal(httpErr)
+	}
+	opErr, ok := urlErr.Err.(*net.OpError)
+	if !ok {
+		t.Fatal(urlErr)
+	}
+
 	want := &schema.Segment{
 		Name: "test",
 		Subsegments: []*schema.Segment{
@@ -429,7 +441,7 @@ func TestClient_InvalidDomain(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
-							Message: "dial tcp: lookup domain.invalid: no such host",
+							Message: opErr.Error(),
 							Type:    "*net.OpError",
 						},
 					},
@@ -446,7 +458,7 @@ func TestClient_InvalidDomain(t *testing.T) {
 									WorkingDirectory: wd,
 									Exceptions: []schema.Exception{
 										{
-											Message: "lookup domain.invalid: no such host",
+											Message: opErr.Err.Error(),
 											Type:    "*net.DNSError",
 										},
 									},
