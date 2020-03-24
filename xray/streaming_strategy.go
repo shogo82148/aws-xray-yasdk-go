@@ -40,6 +40,7 @@ func serialize(seg *Segment) *schema.Segment {
 
 		Namespace:   seg.namespace,
 		User:        seg.user,
+		Origin:      seg.origin,
 		Metadata:    seg.metadata,
 		Annotations: seg.annotations,
 		SQL:         seg.sql,
@@ -113,6 +114,7 @@ func serializeIndependentSubsegment(seg *Segment) *schema.Segment {
 
 		Namespace:   seg.namespace,
 		User:        seg.user,
+		Origin:      seg.origin,
 		Metadata:    seg.metadata,
 		Annotations: seg.annotations,
 		SQL:         seg.sql,

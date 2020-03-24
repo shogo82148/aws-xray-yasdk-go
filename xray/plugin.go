@@ -12,6 +12,10 @@ type Plugin interface {
 	// before submitting the root segment.
 	// The document is the raw data of the segment, and plugins can rewrite it.
 	HandleSegment(segment *Segment, document *schema.Segment)
+
+	// Origin returns the type of AWS resource that the plugin detected.
+	// If the plugin can't detect any type, it returns empty string.
+	Origin() string
 }
 
 var muPlugins sync.RWMutex
@@ -37,11 +41,11 @@ func getPlugins() []Plugin {
 type xrayPlugin struct{}
 
 func init() {
-	AddPlugin(&xrayPlugin{})
+	AddPlugin(xrayPlugin{})
 }
 
 // HandleSegment implements Plugin.
-func (*xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
+func (xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
 		doc.AWS = &schema.AWS{}
 	}
@@ -51,3 +55,6 @@ func (*xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 		RuleName: seg.ruleName,
 	}
 }
+
+// Origin implements Plugin.
+func (xrayPlugin) Origin() string { return "" }

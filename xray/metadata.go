@@ -1,6 +1,8 @@
 package xray
 
 import (
+	"runtime"
+
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
@@ -13,3 +15,10 @@ const Type = "X-Ray YA-SDK for Go"
 // ServiceData is the metadata of the user service.
 // It is used by all segments that X-Ray YA-SDK sends.
 var ServiceData *schema.Service
+
+func init() {
+	ServiceData = &schema.Service{
+		Compiler:        runtime.Compiler,
+		CompilerVersion: runtime.Version(),
+	}
+}

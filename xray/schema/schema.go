@@ -6,6 +6,7 @@ package schema
 const (
 	OriginEC2Instance      = "AWS::EC2::Instance"                 // An Amazon EC2 instance.
 	OriginECSContainer     = "AWS::ECS::Container"                // An Amazon ECS container.
+	OriginEKSContainer     = "AWS::EKS::Container"                // An Amazon EKS container.
 	OriginElasticBeanstalk = "AWS::ElasticBeanstalk::Environment" // An Elastic Beanstalk environment.
 )
 
