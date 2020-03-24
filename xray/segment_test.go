@@ -397,6 +397,12 @@ func TestSegment_SetUser(t *testing.T) {
 		EndTime:   1000000000,
 		User:      "@chooblarin",
 		Service:   ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: Version,
+				Type:    Type,
+			},
+		},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
