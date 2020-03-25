@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http/httptrace"
-	"net/textproto"
 	"sync"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -42,11 +41,6 @@ func (segs *httpSubsegments) GotConn(info httptrace.GotConnInfo) {
 
 	segs.reqCtx, segs.reqSeg = xray.BeginSubsegment(segs.ctx, "request")
 }
-
-func (segs *httpSubsegments) PutIdleConn(err error)                                      {}
-func (segs *httpSubsegments) GotFirstResponseByte()                                      {}
-func (segs *httpSubsegments) Got100Continue()                                            {}
-func (segs *httpSubsegments) Got1xxResponse(code int, header textproto.MIMEHeader) error { return nil }
 
 func (segs *httpSubsegments) DNSStart(info httptrace.DNSStartInfo) {
 	segs.mu.Lock()
@@ -241,10 +235,6 @@ func cipherSuiteName(id uint16) string {
 	return fmt.Sprintf("0x%04X", id)
 }
 
-func (segs *httpSubsegments) WroteHeaderField(key string, value []string) {}
-func (segs *httpSubsegments) WroteHeaders()                               {}
-func (segs *httpSubsegments) Wait100Continue()                            {}
-
 func (segs *httpSubsegments) WroteRequest(info httptrace.WroteRequestInfo) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
@@ -304,22 +294,15 @@ func WithClientTrace(ctx context.Context) (context.Context, context.CancelFunc) 
 	trace := &clientTrace{
 		segments: segs,
 		httptrace: &httptrace.ClientTrace{
-			GetConn:              segs.GetConn,
-			GotConn:              segs.GotConn,
-			PutIdleConn:          segs.PutIdleConn,
-			GotFirstResponseByte: segs.GotFirstResponseByte,
-			Got100Continue:       segs.Got100Continue,
-			Got1xxResponse:       segs.Got1xxResponse,
-			DNSStart:             segs.DNSStart,
-			DNSDone:              segs.DNSDone,
-			ConnectStart:         segs.ConnectStart,
-			ConnectDone:          segs.ConnectDone,
-			TLSHandshakeStart:    segs.TLSHandshakeStart,
-			TLSHandshakeDone:     segs.TLSHandshakeDone,
-			WroteHeaderField:     segs.WroteHeaderField,
-			WroteHeaders:         segs.WroteHeaders,
-			Wait100Continue:      segs.Wait100Continue,
-			WroteRequest:         segs.WroteRequest,
+			GetConn:           segs.GetConn,
+			GotConn:           segs.GotConn,
+			DNSStart:          segs.DNSStart,
+			DNSDone:           segs.DNSDone,
+			ConnectStart:      segs.ConnectStart,
+			ConnectDone:       segs.ConnectDone,
+			TLSHandshakeStart: segs.TLSHandshakeStart,
+			TLSHandshakeDone:  segs.TLSHandshakeDone,
+			WroteRequest:      segs.WroteRequest,
 		},
 	}
 	return httptrace.WithClientTrace(ctx, trace.httptrace), segs.Cancel
