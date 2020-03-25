@@ -3,6 +3,7 @@ package xrayhttp
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -699,6 +701,134 @@ func TestClient_InvalidCertificate(t *testing.T) {
 											Type:    "x509.UnknownAuthorityError",
 										},
 									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestClient_FailRequest(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		if l, err = net.Listen("tcp6", "[::1]:0"); err != nil {
+			panic(fmt.Sprintf("failed to listen on a port: %v", err))
+		}
+	}
+	defer l.Close()
+
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if e, ok := err.(net.Error); ok && e.Temporary() {
+				time.Sleep(50 * time.Millisecond)
+				continue
+			}
+			if err != nil {
+				return
+			}
+			conn.Close()
+		}
+	}()
+
+	var httpErr error
+	func() {
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		req, err := http.NewRequest(http.MethodGet, "http://"+l.Addr().String(), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		req.Host = "example.com"
+		resp, err := client.Do(req)
+		if err != nil {
+			httpErr = err
+			return
+		}
+		defer resp.Body.Close()
+		t.Fatal("want error, but not")
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	urlErr, ok := httpErr.(*url.Error)
+	if !ok {
+		t.Fatal(httpErr)
+	}
+
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "example.com",
+				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    "http://" + l.Addr().String(),
+					},
+				},
+				Fault: true,
+				Cause: &schema.Cause{
+					WorkingDirectory: wd,
+					Exceptions: []schema.Exception{
+						{
+							Message: urlErr.Err.Error(),
+							Type:    "*errors.errorString",
+						},
+					},
+				},
+				Subsegments: []*schema.Segment{
+					{
+						Name: "connect",
+						Subsegments: []*schema.Segment{
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": l.Addr().Network(),
+											"address": l.Addr().String(),
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:  "request",
+						Fault: true,
+						Cause: &schema.Cause{
+							WorkingDirectory: wd,
+							Exceptions: []schema.Exception{
+								{
+									Message: context.Canceled.Error(),
+									Type:    "*errors.errorString",
 								},
 							},
 						},

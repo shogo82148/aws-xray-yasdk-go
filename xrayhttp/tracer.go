@@ -245,10 +245,44 @@ func (segs *httpSubsegments) WroteHeaderField(key string, value []string) {}
 func (segs *httpSubsegments) WroteHeaders()                               {}
 func (segs *httpSubsegments) Wait100Continue()                            {}
 
-func (segs *httpSubsegments) WroteRequest(httptrace.WroteRequestInfo) {
+func (segs *httpSubsegments) WroteRequest(info httptrace.WroteRequestInfo) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.reqCtx != nil {
+	if segs.reqCtx == nil {
+		return
+	}
+	segs.reqSeg.AddError(info.Err)
+	segs.reqSeg.Close()
+	segs.reqCtx, segs.reqSeg = nil, nil
+}
+
+// Cancel clean up all segments and set fault.
+func (segs *httpSubsegments) Cancel() {
+	segs.mu.Lock()
+	defer segs.mu.Unlock()
+
+	if segs.dnsCtx != nil {
+		segs.dnsSeg.AddError(context.Canceled)
+		segs.dnsSeg.Close()
+		segs.dnsCtx, segs.dnsSeg = nil, nil
+	}
+	if segs.dialSeg != nil {
+		segs.dialSeg.AddError(context.Canceled)
+		segs.dialSeg.Close()
+		segs.dialCtx, segs.dialSeg = nil, nil
+	}
+	if segs.tlsSeg != nil {
+		segs.tlsSeg.AddError(context.Canceled)
+		segs.tlsSeg.Close()
+		segs.tlsCtx, segs.tlsSeg = nil, nil
+	}
+	if segs.connSeg != nil {
+		segs.connSeg.AddError(context.Canceled)
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
+	if segs.reqSeg != nil {
+		segs.reqSeg.AddError(context.Canceled)
 		segs.reqSeg.Close()
 		segs.reqCtx, segs.reqSeg = nil, nil
 	}
@@ -260,7 +294,7 @@ type clientTrace struct {
 }
 
 // WithClientTrace returns a new context based on the provided parent ctx.
-func WithClientTrace(ctx context.Context) context.Context {
+func WithClientTrace(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		panic("ctx must not be nil")
 	}
@@ -288,5 +322,5 @@ func WithClientTrace(ctx context.Context) context.Context {
 			WroteRequest:         segs.WroteRequest,
 		},
 	}
-	return httptrace.WithClientTrace(ctx, trace.httptrace)
+	return httptrace.WithClientTrace(ctx, trace.httptrace), segs.Cancel
 }
