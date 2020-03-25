@@ -1,6 +1,7 @@
 package xrayhttp
 
 import (
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,6 +20,7 @@ func TestHandler(t *testing.T) {
 	defer td.Close()
 
 	h := Handler(FixedTracingNamer("test"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("hello")); err != nil {
 			panic(err)
@@ -57,5 +59,20 @@ func TestHandler(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+
+	res := rec.Result()
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("want %d, got %d", http.StatusOK, res.StatusCode)
+	}
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("want %s, got %s", "hello", string(data))
+	}
+	if res.Header.Get("Content-Type") != "text/plain" {
+		t.Errorf("want %s, got %s", "text/plain", res.Header.Get("Content-Type"))
 	}
 }
