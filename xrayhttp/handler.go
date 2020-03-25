@@ -1,6 +1,8 @@
 package xrayhttp
 
 import (
+	"bufio"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -10,6 +12,8 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
+
+//go:generate go run codegen.go
 
 // TracingNamer is the interface for naming service node.
 type TracingNamer interface {
@@ -65,7 +69,6 @@ func Handler(tn TracingNamer, h http.Handler) http.Handler {
 func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := tracer.tn.TracingName(r)
 	ctx, seg := xray.BeginSegmentWithRequest(r.Context(), name, r)
-	defer seg.Close()
 	r = r.WithContext(ctx)
 
 	ip, forwarded := clientIP(r)
@@ -79,7 +82,10 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	seg.SetHTTPRequest(requestInfo)
 
 	rw := &responseTracer{rw: w}
-	tracer.h.ServeHTTP(rw, r)
+	tracer.h.ServeHTTP(wrap(rw), r)
+	if rw.hijacked {
+		return
+	}
 
 	responseInfo := &schema.HTTPResponse{
 		Status:        rw.status,
@@ -95,6 +101,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if rw.status >= 500 && rw.status < 600 {
 		seg.SetFault()
 	}
+	seg.Close()
 }
 
 func getURL(r *http.Request) string {
@@ -124,10 +131,23 @@ func clientIP(r *http.Request) (string, bool) {
 	return ip, false
 }
 
+// backport of io.StringWriter from Go 1.11
+type stringWriter interface {
+	WriteString(s string) (n int, err error)
+}
+
+type responseWriter interface {
+	http.ResponseWriter
+	io.ReaderFrom
+	stringWriter
+}
+
 type responseTracer struct {
-	rw     http.ResponseWriter
-	status int
-	size   int
+	seg      *xray.Segment
+	rw       http.ResponseWriter
+	status   int
+	size     int
+	hijacked bool
 }
 
 func (rw *responseTracer) Header() http.Header {
@@ -146,4 +166,56 @@ func (rw *responseTracer) Write(b []byte) (int, error) {
 func (rw *responseTracer) WriteHeader(s int) {
 	rw.rw.WriteHeader(s)
 	rw.status = s
+}
+
+func (rw *responseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h := rw.rw.(http.Hijacker)
+	conn, buf, err := h.Hijack()
+	if err == nil {
+		if rw.status == 0 {
+			// The status will be StatusSwitchingProtocols if there was no error and
+			// WriteHeader has not been called yet
+			rw.status = http.StatusSwitchingProtocols
+		}
+		rw.hijacked = true
+		responseInfo := &schema.HTTPResponse{
+			Status:        rw.status,
+			ContentLength: rw.size,
+		}
+		rw.seg.SetHTTPResponse(responseInfo)
+		rw.seg.Close()
+	}
+	return conn, buf, err
+}
+
+func (rw *responseTracer) Flush() {
+	if f, ok := rw.rw.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (rw *responseTracer) Push(target string, opts *http.PushOptions) error {
+	if p, ok := rw.rw.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
+}
+
+func (rw *responseTracer) CloseNotify() <-chan bool {
+	n := rw.rw.(http.CloseNotifier)
+	return n.CloseNotify()
+}
+
+func (rw *responseTracer) WriteString(str string) (int, error) {
+	if s, ok := rw.rw.(stringWriter); ok {
+		return s.WriteString(str)
+	}
+	return rw.rw.Write([]byte(str))
+}
+
+func (rw *responseTracer) ReadFrom(src io.Reader) (n int64, err error) {
+	if r, ok := rw.rw.(io.ReaderFrom); ok {
+		return r.ReadFrom(src)
+	}
+	return io.Copy(rw.rw, src)
 }
