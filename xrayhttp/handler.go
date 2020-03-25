@@ -54,8 +54,9 @@ func (tn *DynamicSegmentNamer) TracingName(r *http.Request) string {
 }
 
 type httpTracer struct {
-	tn TracingNamer
-	h  http.Handler
+	tn     TracingNamer
+	client *xray.Client
+	h      http.Handler
 }
 
 // Handler wraps the provided http handler with xray.Capture
@@ -66,9 +67,22 @@ func Handler(tn TracingNamer, h http.Handler) http.Handler {
 	}
 }
 
+// HandlerWithClient wraps the provided http handler with xray.Capture
+func HandlerWithClient(tn TracingNamer, client *xray.Client, h http.Handler) http.Handler {
+	return &httpTracer{
+		tn:     tn,
+		client: client,
+		h:      h,
+	}
+}
+
 func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := tracer.tn.TracingName(r)
-	ctx, seg := xray.BeginSegmentWithRequest(r.Context(), name, r)
+	ctx := r.Context()
+	if tracer.client != nil {
+		ctx = xray.WithClient(ctx, tracer.client)
+	}
+	ctx, seg := xray.BeginSegmentWithRequest(ctx, name, r)
 	r = r.WithContext(ctx)
 
 	ip, forwarded := clientIP(r)
@@ -81,7 +95,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	seg.SetHTTPRequest(requestInfo)
 
-	rw := &responseTracer{rw: w}
+	rw := &responseTracer{rw: w, seg: seg}
 	tracer.h.ServeHTTP(wrap(rw), r)
 	if rw.hijacked {
 		return

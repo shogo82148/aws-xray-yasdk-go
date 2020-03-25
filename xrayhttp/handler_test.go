@@ -87,3 +87,64 @@ func TestHandler(t *testing.T) {
 		t.Errorf("want %s, got %s", "text/plain", res.Header.Get("Content-Type"))
 	}
 }
+
+func TestHandler_Hijack(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	client := xray.ContextClient(ctx)
+	h := HandlerWithClient(FixedTracingNamer("test"), client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hj, ok := w.(http.Hijacker)
+		if !ok {
+			http.Error(w, "webserver doesn't support hijacking", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusSwitchingProtocols)
+		conn, _, err := hj.Hijack()
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+	}))
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/hijack", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		HTTP: &schema.HTTP{
+			Request: &schema.HTTPRequest{
+				Method:    http.MethodGet,
+				URL:       ts.URL + "/hijack",
+				ClientIP:  "127.0.0.1",
+				UserAgent: "Go-http-client/1.1",
+			},
+			Response: &schema.HTTPResponse{
+				Status: http.StatusSwitchingProtocols,
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
