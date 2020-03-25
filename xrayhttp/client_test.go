@@ -145,6 +145,113 @@ func TestClient(t *testing.T) {
 	}
 }
 
+func TestClient_StatusTooManyRequests(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	ch := make(chan xray.TraceHeader, 1)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceHeader := xray.ParseTraceHeader(r.Header.Get(xray.TraceIDHeaderKey))
+		ch <- traceHeader
+		w.WriteHeader(http.StatusTooManyRequests)
+		if _, err := w.Write([]byte("hello")); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		req.Host = "example.com"
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal()
+		}
+		defer resp.Body.Close()
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			t.Fatal()
+		}
+		if string(data) != "hello" {
+			t.Errorf("want %q, got %q", "hello", string(data))
+		}
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "example.com",
+				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    ts.URL,
+					},
+					Response: &schema.HTTPResponse{
+						Status:        http.StatusTooManyRequests,
+						ContentLength: 5,
+					},
+				},
+				Error:    true,
+				Throttle: true,
+				Subsegments: []*schema.Segment{
+					{
+						Name: "connect",
+						Subsegments: []*schema.Segment{
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": "tcp",
+											"address": u.Host,
+										},
+									},
+								},
+							},
+						},
+					},
+					{Name: "request"},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+
+	traceHeader := <-ch
+	if traceHeader.TraceID != got.TraceID {
+		t.Errorf("invalid trace id, want %s, got %s", got.TraceID, traceHeader.TraceID)
+	}
+	if traceHeader.ParentID != got.ID {
+		t.Errorf("invalid parent id, want %s, got %s", got.ID, traceHeader.ParentID)
+	}
+}
+
 func TestClient_TLS(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
