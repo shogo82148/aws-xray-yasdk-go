@@ -20,9 +20,6 @@ type Config struct {
 	StreamingStrategy      StreamingStrategy
 	SamplingStrategy       sampling.Strategy
 	ContextMissingStrategy ctxmissing.Strategy
-
-	// TODO: @shogo82148
-	// AWS_XRAY_TRACING_NAME
 }
 
 type daemonEndpoints struct {

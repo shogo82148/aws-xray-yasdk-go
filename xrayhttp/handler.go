@@ -3,9 +3,11 @@ package xrayhttp
 import (
 	"net"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
@@ -19,7 +21,32 @@ type FixedTracingNamer string
 
 // TracingName implements TracingNamer.
 func (tn FixedTracingNamer) TracingName(r *http.Request) string {
-	return string(tn)
+	if tn != "" {
+		return string(tn)
+	}
+	return os.Getenv("AWS_XRAY_TRACING_NAME")
+}
+
+// DynamicSegmentNamer chooses names for segments generated
+// for incoming requests by parsing the HOST header of the
+// incoming request. If the host header matches a given
+// recognized pattern (using the included pattern package),
+// it is used as the segment name. Otherwise, the fallback
+// name is used.
+type DynamicSegmentNamer struct {
+	FallbackName    string
+	RecognizedHosts string
+}
+
+// TracingName implements TracingNamer.
+func (tn *DynamicSegmentNamer) TracingName(r *http.Request) string {
+	if sampling.WildcardMatchCaseInsensitive(tn.RecognizedHosts, r.Host) {
+		return r.Host
+	}
+	if tn.FallbackName != "" {
+		return tn.FallbackName
+	}
+	return os.Getenv("AWS_XRAY_TRACING_NAME")
 }
 
 type httpTracer struct {
