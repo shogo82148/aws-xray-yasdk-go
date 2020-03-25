@@ -232,9 +232,14 @@ func (rw *responseTracer) WriteString(str string) (int, error) {
 	return size, err
 }
 
-func (rw *responseTracer) ReadFrom(src io.Reader) (n int64, err error) {
+func (rw *responseTracer) ReadFrom(src io.Reader) (int64, error) {
+	var size int64
+	var err error
 	if r, ok := rw.rw.(io.ReaderFrom); ok {
-		return r.ReadFrom(src)
+		size, err = r.ReadFrom(src)
+	} else {
+		size, err = io.Copy(rw.rw, src)
 	}
-	return io.Copy(rw.rw, src)
+	rw.size += size
+	return size, err
 }
