@@ -721,7 +721,7 @@ func TestClient_InvalidCertificate(t *testing.T) {
 	}
 }
 
-func TestClient_FailRequest(t *testing.T) {
+func TestClient_FailToReadResponse(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
 
@@ -743,7 +743,11 @@ func TestClient_FailRequest(t *testing.T) {
 			if err != nil {
 				return
 			}
-			conn.Close()
+			go func() {
+				var b [1024]byte
+				conn.Read(b[:]) // ignore http request
+				conn.Close()
+			}()
 		}
 	}()
 
@@ -821,17 +825,7 @@ func TestClient_FailRequest(t *testing.T) {
 						},
 					},
 					{
-						Name:  "request",
-						Fault: true,
-						Cause: &schema.Cause{
-							WorkingDirectory: wd,
-							Exceptions: []schema.Exception{
-								{
-									Message: context.Canceled.Error(),
-									Type:    "*errors.errorString",
-								},
-							},
-						},
+						Name: "request",
 					},
 				},
 			},
