@@ -64,7 +64,8 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	seg.SetHTTPRequest(requestInfo)
 
-	ctx = WithClientTrace(ctx)
+	ctx, cancel := WithClientTrace(ctx)
+	defer cancel()
 	req = req.WithContext(ctx)
 	resp, err := rt.Base.RoundTrip(req)
 	if err != nil {

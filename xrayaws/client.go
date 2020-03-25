@@ -11,16 +11,17 @@ import (
 )
 
 type subsegments struct {
-	mu           sync.Mutex
-	ctx          context.Context
-	awsCtx       context.Context
-	awsSeg       *xray.Segment
-	marshalCtx   context.Context
-	marshalSeg   *xray.Segment
-	attemptCtx   context.Context
-	attemptSeg   *xray.Segment
-	unmarshalCtx context.Context
-	unmarshalSeg *xray.Segment
+	mu            sync.Mutex
+	ctx           context.Context
+	awsCtx        context.Context
+	awsSeg        *xray.Segment
+	marshalCtx    context.Context
+	marshalSeg    *xray.Segment
+	attemptCtx    context.Context
+	attemptSeg    *xray.Segment
+	attemptCancel context.CancelFunc
+	unmarshalCtx  context.Context
+	unmarshalSeg  *xray.Segment
 }
 
 func contextSubsegments(ctx context.Context) *subsegments {
@@ -71,7 +72,8 @@ func (segs *subsegments) beforeSign(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 	segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
-	ctx := xrayhttp.WithClientTrace(segs.attemptCtx)
+	ctx, cancel := xrayhttp.WithClientTrace(segs.attemptCtx)
+	segs.attemptCancel = cancel
 	r.HTTPRequest = r.HTTPRequest.WithContext(ctx)
 }
 
@@ -153,6 +155,7 @@ func (segs *subsegments) afterComplete(r *request.Request) {
 
 func (segs *subsegments) closeAll() {
 	if segs.attemptSeg != nil {
+		segs.attemptCancel()
 		segs.attemptSeg.Close()
 		segs.attemptCtx, segs.attemptSeg = nil, nil
 	}
@@ -178,8 +181,8 @@ var segmentsContextKey = &contextKey{"segments"}
 
 func pushHandlers(handlers *request.Handlers, completionWhitelistFilename string) {
 	handlers.Validate.PushFrontNamed(beforeValidate)
-	handlers.Build.PushBackNamed(afterBuild)
 	handlers.Sign.PushFrontNamed(beforeSign)
+	handlers.Build.PushBackNamed(afterBuild)
 	handlers.UnmarshalMeta.PushFrontNamed(beforeUnmarshalMeta)
 	handlers.UnmarshalError.PushBackNamed(afterUnmarshalError)
 	handlers.Unmarshal.PushBackNamed(afterUnmarshal)

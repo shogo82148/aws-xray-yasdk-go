@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http/httptrace"
-	"net/textproto"
 	"sync"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -43,11 +42,6 @@ func (segs *httpSubsegments) GotConn(info httptrace.GotConnInfo) {
 	segs.reqCtx, segs.reqSeg = xray.BeginSubsegment(segs.ctx, "request")
 }
 
-func (segs *httpSubsegments) PutIdleConn(err error)                                      {}
-func (segs *httpSubsegments) GotFirstResponseByte()                                      {}
-func (segs *httpSubsegments) Got100Continue()                                            {}
-func (segs *httpSubsegments) Got1xxResponse(code int, header textproto.MIMEHeader) error { return nil }
-
 func (segs *httpSubsegments) DNSStart(info httptrace.DNSStartInfo) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
@@ -80,6 +74,12 @@ func (segs *httpSubsegments) DNSDone(info httptrace.DNSDoneInfo) {
 	segs.dnsSeg.AddError(info.Err)
 	segs.dnsSeg.Close()
 	segs.dnsCtx, segs.dnsSeg = nil, nil
+
+	if info.Err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func (segs *httpSubsegments) ConnectStart(network, addr string) {
@@ -108,6 +108,12 @@ func (segs *httpSubsegments) ConnectDone(network, addr string, err error) {
 	segs.dialSeg.AddError(err)
 	segs.dialSeg.Close()
 	segs.dialCtx, segs.dialSeg = nil, nil
+
+	if err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func (segs *httpSubsegments) TLSHandshakeStart() {
@@ -133,15 +139,23 @@ func (segs *httpSubsegments) TLSHandshakeDone(state tls.ConnectionState, err err
 	if segs.tlsCtx == nil {
 		return
 	}
-	segs.tlsSeg.AddMetadataToNamespace("http", "tls", tlsInfo{
-		Version:                    tlsVersionName(state.Version),
-		DidResume:                  state.DidResume,
-		NegotiatedProtocol:         state.NegotiatedProtocol,
-		NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
-		CipherSuite:                cipherSuiteName(state.CipherSuite),
-	})
+	if !segs.tlsSeg.AddError(err) {
+		segs.tlsSeg.AddMetadataToNamespace("http", "tls", tlsInfo{
+			Version:                    tlsVersionName(state.Version),
+			DidResume:                  state.DidResume,
+			NegotiatedProtocol:         state.NegotiatedProtocol,
+			NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
+			CipherSuite:                cipherSuiteName(state.CipherSuite),
+		})
+	}
 	segs.tlsSeg.Close()
 	segs.tlsCtx, segs.tlsSeg = nil, nil
+
+	if err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func tlsVersionName(version uint16) string {
@@ -221,14 +235,44 @@ func cipherSuiteName(id uint16) string {
 	return fmt.Sprintf("0x%04X", id)
 }
 
-func (segs *httpSubsegments) WroteHeaderField(key string, value []string) {}
-func (segs *httpSubsegments) WroteHeaders()                               {}
-func (segs *httpSubsegments) Wait100Continue()                            {}
-
-func (segs *httpSubsegments) WroteRequest(httptrace.WroteRequestInfo) {
+func (segs *httpSubsegments) WroteRequest(info httptrace.WroteRequestInfo) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.reqCtx != nil {
+	if segs.reqCtx == nil {
+		return
+	}
+	segs.reqSeg.AddError(info.Err)
+	segs.reqSeg.Close()
+	segs.reqCtx, segs.reqSeg = nil, nil
+}
+
+// Cancel clean up all segments and set fault.
+func (segs *httpSubsegments) Cancel() {
+	segs.mu.Lock()
+	defer segs.mu.Unlock()
+
+	if segs.dnsCtx != nil {
+		segs.dnsSeg.AddError(context.Canceled)
+		segs.dnsSeg.Close()
+		segs.dnsCtx, segs.dnsSeg = nil, nil
+	}
+	if segs.dialSeg != nil {
+		segs.dialSeg.AddError(context.Canceled)
+		segs.dialSeg.Close()
+		segs.dialCtx, segs.dialSeg = nil, nil
+	}
+	if segs.tlsSeg != nil {
+		segs.tlsSeg.AddError(context.Canceled)
+		segs.tlsSeg.Close()
+		segs.tlsCtx, segs.tlsSeg = nil, nil
+	}
+	if segs.connSeg != nil {
+		segs.connSeg.AddError(context.Canceled)
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
+	if segs.reqSeg != nil {
+		segs.reqSeg.AddError(context.Canceled)
 		segs.reqSeg.Close()
 		segs.reqCtx, segs.reqSeg = nil, nil
 	}
@@ -240,7 +284,7 @@ type clientTrace struct {
 }
 
 // WithClientTrace returns a new context based on the provided parent ctx.
-func WithClientTrace(ctx context.Context) context.Context {
+func WithClientTrace(ctx context.Context) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		panic("ctx must not be nil")
 	}
@@ -250,23 +294,16 @@ func WithClientTrace(ctx context.Context) context.Context {
 	trace := &clientTrace{
 		segments: segs,
 		httptrace: &httptrace.ClientTrace{
-			GetConn:              segs.GetConn,
-			GotConn:              segs.GotConn,
-			PutIdleConn:          segs.PutIdleConn,
-			GotFirstResponseByte: segs.GotFirstResponseByte,
-			Got100Continue:       segs.Got100Continue,
-			Got1xxResponse:       segs.Got1xxResponse,
-			DNSStart:             segs.DNSStart,
-			DNSDone:              segs.DNSDone,
-			ConnectStart:         segs.ConnectStart,
-			ConnectDone:          segs.ConnectDone,
-			TLSHandshakeStart:    segs.TLSHandshakeStart,
-			TLSHandshakeDone:     segs.TLSHandshakeDone,
-			WroteHeaderField:     segs.WroteHeaderField,
-			WroteHeaders:         segs.WroteHeaders,
-			Wait100Continue:      segs.Wait100Continue,
-			WroteRequest:         segs.WroteRequest,
+			GetConn:           segs.GetConn,
+			GotConn:           segs.GotConn,
+			DNSStart:          segs.DNSStart,
+			DNSDone:           segs.DNSDone,
+			ConnectStart:      segs.ConnectStart,
+			ConnectDone:       segs.ConnectDone,
+			TLSHandshakeStart: segs.TLSHandshakeStart,
+			TLSHandshakeDone:  segs.TLSHandshakeDone,
+			WroteRequest:      segs.WroteRequest,
 		},
 	}
-	return httptrace.WithClientTrace(ctx, trace.httptrace)
+	return httptrace.WithClientTrace(ctx, trace.httptrace), segs.Cancel
 }
