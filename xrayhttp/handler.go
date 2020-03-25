@@ -160,7 +160,7 @@ type responseTracer struct {
 	seg      *xray.Segment
 	rw       http.ResponseWriter
 	status   int
-	size     int
+	size     int64
 	hijacked bool
 }
 
@@ -173,7 +173,7 @@ func (rw *responseTracer) Write(b []byte) (int, error) {
 		rw.WriteHeader(http.StatusOK)
 	}
 	size, err := rw.rw.Write(b)
-	rw.size += size
+	rw.size += int64(size)
 	return size, err
 }
 
@@ -228,7 +228,7 @@ func (rw *responseTracer) WriteString(str string) (int, error) {
 	} else {
 		size, err = rw.rw.Write([]byte(str))
 	}
-	rw.size += size
+	rw.size += int64(size)
 	return size, err
 }
 
