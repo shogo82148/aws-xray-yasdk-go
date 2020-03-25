@@ -598,3 +598,123 @@ func TestClient_InvalidAddress(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestClient_InvalidCertificate(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("hello")); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var httpErr error
+	func() {
+		// we don't use ts.Client() here, because we want to test certificate error
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		req.Host = "example.com"
+		resp, err := client.Do(req)
+		if err != nil {
+			httpErr = err
+			return
+		}
+		defer resp.Body.Close()
+		t.Fatal("want error, but not")
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	urlErr, ok := httpErr.(*url.Error)
+	if !ok {
+		t.Fatal(httpErr)
+	}
+
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "example.com",
+				Namespace: "remote",
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    ts.URL,
+					},
+				},
+				Fault: true,
+				Cause: &schema.Cause{
+					WorkingDirectory: wd,
+					Exceptions: []schema.Exception{
+						{
+							Message: urlErr.Err.Error(),
+							Type:    "x509.UnknownAuthorityError",
+						},
+					},
+				},
+				Subsegments: []*schema.Segment{
+					{
+						Name:  "connect",
+						Fault: true,
+						Subsegments: []*schema.Segment{
+							{
+								Name: "dial",
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"address": u.Host,
+											"network": "tcp",
+										},
+									},
+								},
+							},
+							{
+								Name:  "tls",
+								Fault: true,
+								Cause: &schema.Cause{
+									WorkingDirectory: wd,
+									Exceptions: []schema.Exception{
+										{
+											Message: urlErr.Err.Error(),
+											Type:    "x509.UnknownAuthorityError",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}

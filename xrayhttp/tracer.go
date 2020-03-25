@@ -145,15 +145,23 @@ func (segs *httpSubsegments) TLSHandshakeDone(state tls.ConnectionState, err err
 	if segs.tlsCtx == nil {
 		return
 	}
-	segs.tlsSeg.AddMetadataToNamespace("http", "tls", tlsInfo{
-		Version:                    tlsVersionName(state.Version),
-		DidResume:                  state.DidResume,
-		NegotiatedProtocol:         state.NegotiatedProtocol,
-		NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
-		CipherSuite:                cipherSuiteName(state.CipherSuite),
-	})
+	if !segs.tlsSeg.AddError(err) {
+		segs.tlsSeg.AddMetadataToNamespace("http", "tls", tlsInfo{
+			Version:                    tlsVersionName(state.Version),
+			DidResume:                  state.DidResume,
+			NegotiatedProtocol:         state.NegotiatedProtocol,
+			NegotiatedProtocolIsMutual: state.NegotiatedProtocolIsMutual,
+			CipherSuite:                cipherSuiteName(state.CipherSuite),
+		})
+	}
 	segs.tlsSeg.Close()
 	segs.tlsCtx, segs.tlsSeg = nil, nil
+
+	if err != nil && segs.connCtx != nil {
+		segs.connSeg.SetFault()
+		segs.connSeg.Close()
+		segs.connCtx, segs.connSeg = nil, nil
+	}
 }
 
 func tlsVersionName(version uint16) string {
