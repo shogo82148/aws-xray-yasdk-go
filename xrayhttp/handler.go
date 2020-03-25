@@ -221,10 +221,15 @@ func (rw *responseTracer) CloseNotify() <-chan bool {
 }
 
 func (rw *responseTracer) WriteString(str string) (int, error) {
+	var size int
+	var err error
 	if s, ok := rw.rw.(stringWriter); ok {
-		return s.WriteString(str)
+		size, err = s.WriteString(str)
+	} else {
+		size, err = rw.rw.Write([]byte(str))
 	}
-	return rw.rw.Write([]byte(str))
+	rw.size += size
+	return size, err
 }
 
 func (rw *responseTracer) ReadFrom(src io.Reader) (n int64, err error) {
