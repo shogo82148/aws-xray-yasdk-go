@@ -24,6 +24,19 @@ var dialer = net.Dialer{
 
 var defaultClient = New(nil)
 
+// ContextClient returns the client of current context.
+func ContextClient(ctx context.Context) *Client {
+	if client := ctx.Value(clientContextKey); client != nil {
+		return client.(*Client)
+	}
+	return defaultClient
+}
+
+// WithClient returns new context with the client.
+func WithClient(ctx context.Context, client *Client) context.Context {
+	return context.WithValue(ctx, clientContextKey, client)
+}
+
 // Client is a client for AWS X-Ray daemon.
 type Client struct {
 	// the address of the AWS X-Ray daemon

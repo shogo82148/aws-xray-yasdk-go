@@ -76,7 +76,7 @@ func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	responseInfo := &schema.HTTPResponse{
 		Status: resp.StatusCode,
 	}
-	if length, err := strconv.Atoi(resp.Header.Get("Content-Length")); err == nil {
+	if length, err := strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64); err == nil {
 		responseInfo.ContentLength = length
 	}
 	seg.SetHTTPResponse(responseInfo)

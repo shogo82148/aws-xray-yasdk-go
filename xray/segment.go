@@ -332,10 +332,7 @@ func (seg *Segment) client() *Client {
 	}
 	seg.mu.RLock()
 	defer seg.mu.RUnlock()
-	if client := seg.ctx.Value(clientContextKey); client != nil {
-		return client.(*Client)
-	}
-	return defaultClient
+	return ContextClient(seg.ctx)
 }
 
 func newExceptionID() string {

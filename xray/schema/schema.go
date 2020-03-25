@@ -132,7 +132,7 @@ type HTTPResponse struct {
 	Status int `json:"status,omitempty"`
 
 	// number indicating the length of the response body in bytes.
-	ContentLength int `json:"content_length,omitempty"`
+	ContentLength int64 `json:"content_length,omitempty"`
 }
 
 // AWS is information about the AWS resource on which your application served the request.
