@@ -20,6 +20,17 @@ func TestHandler(t *testing.T) {
 	defer td.Close()
 
 	h := Handler(FixedTracingNamer("test"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// check optional interface of http.ResponseWriter
+		if _, ok := w.(http.Hijacker); ok {
+			t.Error("want not implement http.Hijacker, but it does")
+		}
+		if _, ok := w.(http.Flusher); !ok {
+			t.Error("want implement http.Flusher, but it doesn't")
+		}
+		if _, ok := w.(http.Pusher); ok {
+			t.Error("want not implement http.Pusher, but it does")
+		}
+
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte("hello")); err != nil {

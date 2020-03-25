@@ -26,29 +26,29 @@ func wrap(rw *responseTracer) http.ResponseWriter {
 	case 0x1:
 		return struct {
 			responseWriter
-			http.Pusher
+			http.Flusher
 		}{rw, rw}
 	case 0x2:
 		return struct {
 			responseWriter
-			http.Hijacker
+			http.CloseNotifier
 		}{rw, rw}
 	case 0x3:
 		return struct {
 			responseWriter
-			http.Hijacker
-			http.Pusher
+			http.Flusher
+			http.CloseNotifier
 		}{rw, rw, rw}
 	case 0x4:
 		return struct {
 			responseWriter
-			http.CloseNotifier
+			http.Hijacker
 		}{rw, rw}
 	case 0x5:
 		return struct {
 			responseWriter
-			http.CloseNotifier
-			http.Pusher
+			http.Flusher
+			http.Hijacker
 		}{rw, rw, rw}
 	case 0x6:
 		return struct {
@@ -59,14 +59,14 @@ func wrap(rw *responseTracer) http.ResponseWriter {
 	case 0x7:
 		return struct {
 			responseWriter
+			http.Flusher
 			http.CloseNotifier
 			http.Hijacker
-			http.Pusher
 		}{rw, rw, rw, rw}
 	case 0x8:
 		return struct {
 			responseWriter
-			http.Flusher
+			http.Pusher
 		}{rw, rw}
 	case 0x9:
 		return struct {
@@ -77,35 +77,35 @@ func wrap(rw *responseTracer) http.ResponseWriter {
 	case 0xa:
 		return struct {
 			responseWriter
-			http.Flusher
-			http.Hijacker
+			http.CloseNotifier
+			http.Pusher
 		}{rw, rw, rw}
 	case 0xb:
 		return struct {
 			responseWriter
 			http.Flusher
-			http.Hijacker
+			http.CloseNotifier
 			http.Pusher
 		}{rw, rw, rw, rw}
 	case 0xc:
 		return struct {
 			responseWriter
-			http.Flusher
-			http.CloseNotifier
+			http.Hijacker
+			http.Pusher
 		}{rw, rw, rw}
 	case 0xd:
 		return struct {
 			responseWriter
 			http.Flusher
-			http.CloseNotifier
+			http.Hijacker
 			http.Pusher
 		}{rw, rw, rw, rw}
 	case 0xe:
 		return struct {
 			responseWriter
-			http.Flusher
 			http.CloseNotifier
 			http.Hijacker
+			http.Pusher
 		}{rw, rw, rw, rw}
 	case 0xf:
 		return struct {

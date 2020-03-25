@@ -62,7 +62,7 @@ func generate(interfaces []string, path string) {
 		fields := make([]string, 0, len(interfaces))
 		fields = append(fields, "responseWriter")
 		for j, iface := range interfaces {
-			ok := i&(1<<uint(len(interfaces)-j-1)) > 0
+			ok := i&(1<<uint(j)) > 0
 			if ok {
 				fields = append(fields, iface)
 			}
