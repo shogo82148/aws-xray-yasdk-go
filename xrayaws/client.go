@@ -89,6 +89,30 @@ var beforeSign = request.NamedHandler{
 	},
 }
 
+func (segs *subsegments) afterSend(r *request.Request) {
+	segs.mu.Lock()
+	defer segs.mu.Unlock()
+	if segs.attemptSeg != nil {
+		if r.Error != nil {
+			// r.Error will be stored into segs.awsSeg,
+			// so we just set fault here.
+			segs.attemptSeg.SetFault()
+		}
+		segs.attemptCancel()
+		segs.attemptSeg.Close()
+		segs.attemptCtx, segs.attemptSeg = nil, nil
+	}
+}
+
+var afterSend = request.NamedHandler{
+	Name: "XRayAfterSendHandler",
+	Fn: func(r *request.Request) {
+		if segs := contextSubsegments(r.HTTPRequest.Context()); segs != nil {
+			segs.afterSend(r)
+		}
+	},
+}
+
 func (segs *subsegments) beforeUnmarshalMeta(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
@@ -184,6 +208,7 @@ func pushHandlers(handlers *request.Handlers, completionWhitelistFilename string
 	handlers.Validate.PushFrontNamed(beforeValidate)
 	handlers.Sign.PushFrontNamed(beforeSign)
 	handlers.Build.PushBackNamed(afterBuild)
+	handlers.Send.PushBackNamed(afterSend)
 	handlers.UnmarshalMeta.PushFrontNamed(beforeUnmarshalMeta)
 	handlers.UnmarshalError.PushBackNamed(afterUnmarshalError)
 	handlers.Unmarshal.PushBackNamed(afterUnmarshal)
