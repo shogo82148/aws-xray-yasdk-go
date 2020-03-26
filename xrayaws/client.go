@@ -56,7 +56,10 @@ var beforeValidate = request.NamedHandler{
 func (segs *subsegments) afterBuild(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	segs.closeAll()
+	if segs.marshalSeg != nil {
+		segs.marshalSeg.Close()
+		segs.marshalCtx, segs.marshalSeg = nil, nil
+	}
 }
 
 var afterBuild = request.NamedHandler{
@@ -144,16 +147,8 @@ var afterUnmarshal = request.NamedHandler{
 func (segs *subsegments) afterComplete(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	segs.closeAll()
 
-	if request.IsErrorThrottle(r.Error) {
-		segs.awsSeg.SetThrottle()
-	}
-	segs.awsSeg.AddError(r.Error)
-	segs.awsSeg.Close()
-}
-
-func (segs *subsegments) closeAll() {
+	// make share all segments closed.
 	if segs.attemptSeg != nil {
 		segs.attemptCancel()
 		segs.attemptSeg.Close()
@@ -167,6 +162,12 @@ func (segs *subsegments) closeAll() {
 		segs.unmarshalSeg.Close()
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
+
+	if request.IsErrorThrottle(r.Error) {
+		segs.awsSeg.SetThrottle()
+	}
+	segs.awsSeg.AddError(r.Error)
+	segs.awsSeg.Close()
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
