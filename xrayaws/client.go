@@ -56,7 +56,10 @@ var beforeValidate = request.NamedHandler{
 func (segs *subsegments) afterBuild(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	segs.closeAll()
+	if segs.marshalSeg != nil {
+		segs.marshalSeg.Close()
+		segs.marshalCtx, segs.marshalSeg = nil, nil
+	}
 }
 
 var afterBuild = request.NamedHandler{
@@ -82,6 +85,30 @@ var beforeSign = request.NamedHandler{
 	Fn: func(r *request.Request) {
 		if segs := contextSubsegments(r.HTTPRequest.Context()); segs != nil {
 			segs.beforeSign(r)
+		}
+	},
+}
+
+func (segs *subsegments) afterSend(r *request.Request) {
+	segs.mu.Lock()
+	defer segs.mu.Unlock()
+	if segs.attemptSeg != nil {
+		if r.Error != nil {
+			// r.Error will be stored into segs.awsSeg,
+			// so we just set fault here.
+			segs.attemptSeg.SetFault()
+		}
+		segs.attemptCancel()
+		segs.attemptSeg.Close()
+		segs.attemptCtx, segs.attemptSeg = nil, nil
+	}
+}
+
+var afterSend = request.NamedHandler{
+	Name: "XRayAfterSendHandler",
+	Fn: func(r *request.Request) {
+		if segs := contextSubsegments(r.HTTPRequest.Context()); segs != nil {
+			segs.afterSend(r)
 		}
 	},
 }
@@ -144,16 +171,8 @@ var afterUnmarshal = request.NamedHandler{
 func (segs *subsegments) afterComplete(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	segs.closeAll()
 
-	if request.IsErrorThrottle(r.Error) {
-		segs.awsSeg.SetThrottle()
-	}
-	segs.awsSeg.AddError(r.Error)
-	segs.awsSeg.Close()
-}
-
-func (segs *subsegments) closeAll() {
+	// make share all segments closed.
 	if segs.attemptSeg != nil {
 		segs.attemptCancel()
 		segs.attemptSeg.Close()
@@ -167,6 +186,12 @@ func (segs *subsegments) closeAll() {
 		segs.unmarshalSeg.Close()
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
+
+	if request.IsErrorThrottle(r.Error) {
+		segs.awsSeg.SetThrottle()
+	}
+	segs.awsSeg.AddError(r.Error)
+	segs.awsSeg.Close()
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
@@ -183,6 +208,7 @@ func pushHandlers(handlers *request.Handlers, completionWhitelistFilename string
 	handlers.Validate.PushFrontNamed(beforeValidate)
 	handlers.Sign.PushFrontNamed(beforeSign)
 	handlers.Build.PushBackNamed(afterBuild)
+	handlers.Send.PushBackNamed(afterSend)
 	handlers.UnmarshalMeta.PushFrontNamed(beforeUnmarshalMeta)
 	handlers.UnmarshalError.PushBackNamed(afterUnmarshalError)
 	handlers.Unmarshal.PushBackNamed(afterUnmarshal)
