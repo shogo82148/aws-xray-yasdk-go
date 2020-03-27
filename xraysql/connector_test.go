@@ -298,3 +298,68 @@ func TestConnect_oracle(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func TestConnect_ConnContext(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
+		Name:     "TestConnect",
+		ConnType: "fakeConnCtx",
+		Expect: []FakeExpect{
+			&ExpectQuery{
+				Query:   "SELECT version(), current_user, current_database()",
+				Columns: []string{"version()", "current_user", "current_database()"},
+				Rows: [][]driver.Value{
+					{"0.0.0", "postgresql_user", "postgresql"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		connector := NewConnector(rawConnector)
+		conn, err := connector.Connect(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		Subsegments: []*schema.Segment{
+			{Name: "detect database type"},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CONNECT",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+		},
+		Service: xray.ServiceData,
+		AWS: &schema.AWS{
+			XRay: &schema.XRay{
+				Version: xray.Version,
+				Type:    xray.Type,
+			},
+		},
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}

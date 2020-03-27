@@ -16,11 +16,7 @@ type driverConn struct {
 }
 
 func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
-	c, err := d.OpenConnector(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	return c.Connect(context.Background())
+	panic("not supported")
 }
 
 func (conn *driverConn) Ping(ctx context.Context) error {

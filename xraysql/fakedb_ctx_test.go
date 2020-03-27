@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 )
 
 func init() {
@@ -131,6 +132,26 @@ var _ driver.ColumnConverter = &fakeStmtCtx{}
 var _ driver.StmtExecContext = &fakeStmtCtx{}
 var _ driver.StmtQueryContext = &fakeStmtCtx{}
 
+// fetch next expected action.
+// v should be a pointer.
+func (c *fakeConnCtx) fetchExpected(v interface{}) error {
+	ptr := reflect.ValueOf(v)
+	if ptr.Kind() != reflect.Ptr || ptr.IsNil() {
+		return fmt.Errorf("unsupported type: %v", ptr.Type())
+	}
+	ptr = ptr.Elem()
+	if len(c.expect) == 0 {
+		return fmt.Errorf("unexpected execution: want %v, got none", ptr.Type())
+	}
+	expect := reflect.ValueOf(c.expect[0])
+	c.expect = c.expect[1:]
+	if ptr.Type() != expect.Type() {
+		return fmt.Errorf("unexpected execution: want %v, got %v", ptr.Type(), expect.Type())
+	}
+	ptr.Set(expect)
+	return nil
+}
+
 func (c *fakeConnCtx) Ping(ctx context.Context) error {
 	c.db.printf("[Conn.Ping]")
 	return nil
@@ -142,10 +163,16 @@ func (c *fakeConnCtx) Prepare(query string) (driver.Stmt, error) {
 
 func (c *fakeConnCtx) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	c.db.printf("[Conn.PrepareContext] %s", query)
+	var expect *ExpectQuery
+	if err := c.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
 	return &fakeStmtCtx{
-		db:  c.db,
-		opt: c.opt,
+		db:    c.db,
+		opt:   c.opt,
+		query: expect,
 	}, nil
+
 }
 
 func (c *fakeConnCtx) Close() error {
@@ -205,8 +232,17 @@ func (stmt *fakeStmtCtx) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (stmt *fakeStmtCtx) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	stmt.db.printf("[Conn.QueryContext] %s", convertNamedValuesToString(args))
-	return &fakeRows{}, nil
+	stmt.db.printf("[Stmt.QueryContext] %s", convertNamedValuesToString(args))
+	if stmt.query == nil {
+		return nil, errors.New("expected Exec, but got Query")
+	}
+	if stmt.query.Err != nil {
+		return nil, stmt.query.Err
+	}
+	return &fakeRows{
+		columns: stmt.query.Columns,
+		rows:    stmt.query.Rows,
+	}, nil
 }
 
 func (stmt *fakeStmtCtx) ColumnConverter(idx int) driver.ValueConverter {
