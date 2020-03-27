@@ -18,10 +18,10 @@ func TestConnect_postgresql(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
 
-	rawConnector, err := fdriverctx.OpenConnectorWithOption(fakeConnOption{
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
 		Name:     "TestConnect",
 		ConnType: "fakeConn",
-		Expect: []fakeExpect{
+		Expect: []FakeExpect{
 			&ExpectQuery{
 				Query:   "SELECT version(), current_user, current_database()",
 				Columns: []string{"version()", "current_user", "current_database()"},

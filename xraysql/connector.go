@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 	"sync"
@@ -212,6 +213,7 @@ func postgresDetector(ctx context.Context, conn driver.Conn, attr *dbAttribute) 
 		&databaseVersion, &user, &dbname,
 	)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	attr.databaseType = "Postgres"

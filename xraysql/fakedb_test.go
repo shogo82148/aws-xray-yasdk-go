@@ -1,11 +1,7 @@
 package xraysql
 
 import (
-	"bytes"
-	"context"
-	"database/sql"
 	"database/sql/driver"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,7 +9,21 @@ import (
 	"sync"
 )
 
-type fakeExpect interface{}
+var muOptionPool sync.RWMutex
+var optionPool map[string]*FakeConnOption
+
+func AddOption(opt *FakeConnOption) (dsn string) {
+	name := fmt.Sprintf("%p", opt)
+	muOptionPool.Lock()
+	defer muOptionPool.Unlock()
+	if optionPool == nil {
+		optionPool = make(map[string]*FakeConnOption)
+	}
+	optionPool[name] = opt
+	return name
+}
+
+type FakeExpect interface{}
 
 type ExpectQuery struct {
 	Query   string
@@ -23,19 +33,14 @@ type ExpectQuery struct {
 }
 
 // fakeConnOption is options for fake database.
-type fakeConnOption struct {
+type FakeConnOption struct {
 	// name is the name of database
 	Name string
 
 	// ConnType enhances the driver implementation
 	ConnType string
 
-	Expect []fakeExpect
-}
-
-type fakeDriver struct {
-	mu  sync.Mutex
-	dbs map[string]*fakeDB
+	Expect []FakeExpect
 }
 
 type fakeDB struct {
@@ -46,20 +51,20 @@ type fakeDB struct {
 // fakeConn is minimum implementation of driver.Conn
 type fakeConn struct {
 	db     *fakeDB
-	opt    *fakeConnOption
-	expect []fakeExpect
+	opt    *FakeConnOption
+	expect []FakeExpect
 }
 
 // fakeTx is a fake transaction.
 type fakeTx struct {
 	db  *fakeDB
-	opt *fakeConnOption
+	opt *FakeConnOption
 }
 
 // fakeStmt is minimum implementation of driver.Stmt
 type fakeStmt struct {
 	db    *fakeDB
-	opt   *fakeConnOption
+	opt   *FakeConnOption
 	query *ExpectQuery
 }
 
@@ -69,70 +74,10 @@ type fakeRows struct {
 	rows    [][]driver.Value
 }
 
-var fdriver = &fakeDriver{}
-var _ driver.Driver = fdriver
 var _ driver.Conn = &fakeConn{}
 var _ driver.Tx = &fakeTx{}
 var _ driver.Stmt = &fakeStmt{}
 var _ driver.Rows = &fakeRows{}
-
-func init() {
-	sql.Register("fakedb", fdriver)
-}
-
-func (d *fakeDriver) Open(name string) (driver.Conn, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	var opt fakeConnOption
-	err := json.Unmarshal([]byte(name), &opt)
-	if err != nil {
-		return nil, err
-	}
-
-	db, ok := d.dbs[opt.Name]
-	if !ok {
-		db = &fakeDB{
-			log: []string{},
-		}
-		if d.dbs == nil {
-			d.dbs = make(map[string]*fakeDB)
-		}
-		d.dbs[name] = db
-	}
-
-	var conn driver.Conn
-	switch opt.ConnType {
-	case "", "fakeConn":
-		conn = &fakeConn{
-			db:     db,
-			opt:    &opt,
-			expect: opt.Expect,
-		}
-	case "fakeConnExt":
-		conn = &fakeConnExt{
-			db:     db,
-			opt:    &opt,
-			expect: opt.Expect,
-		}
-	case "fakeConnCtx":
-		conn = &fakeConnCtx{
-			db:     db,
-			opt:    &opt,
-			expect: opt.Expect,
-		}
-	default:
-		return nil, errors.New("known ConnType")
-	}
-
-	return conn, nil
-}
-
-func (d *fakeDriver) DB(name string) *fakeDB {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.dbs[name]
-}
 
 // printf write the params to the log.
 func (db *fakeDB) printf(format string, params ...interface{}) {
@@ -248,116 +193,4 @@ func (rows *fakeRows) Next(dest []driver.Value) error {
 	}
 	rows.idx++
 	return nil
-}
-
-type fakeDriverCtx fakeDriver
-type fakeConnector struct {
-	driver *fakeDriverCtx
-	opt    *fakeConnOption
-	db     *fakeDB
-}
-
-var fdriverctx = &fakeDriverCtx{}
-var _ driver.DriverContext = fdriverctx
-var _ driver.Connector = &fakeConnector{}
-
-func init() {
-	sql.Register("fakedbctx", fdriverctx)
-}
-
-func (d *fakeDriverCtx) Open(name string) (driver.Conn, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (d *fakeDriverCtx) OpenConnector(name string) (driver.Connector, error) {
-	var opt fakeConnOption
-	err := json.Unmarshal([]byte(name), &opt)
-	if err != nil {
-		return nil, err
-	}
-	return d.OpenConnectorWithOption(opt)
-}
-
-func (d *fakeDriverCtx) OpenConnectorWithOption(opt fakeConnOption) (driver.Connector, error) {
-	// validate options
-	switch opt.ConnType {
-	case "", "fakeConn", "fakeConnExt", "fakeConnCtx":
-		// validation OK
-	default:
-		return nil, errors.New("known ConnType")
-	}
-
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	db, ok := d.dbs[opt.Name]
-	if !ok {
-		db = &fakeDB{
-			log: []string{},
-		}
-		if d.dbs == nil {
-			d.dbs = make(map[string]*fakeDB)
-		}
-		d.dbs[opt.Name] = db
-	}
-
-	return &fakeConnector{
-		driver: d,
-		opt:    &opt,
-		db:     db,
-	}, nil
-}
-
-func (d *fakeDriverCtx) DB(name string) *fakeDB {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	return d.dbs[name]
-}
-
-func (c *fakeConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	var conn driver.Conn
-	opt := c.opt
-	switch opt.ConnType {
-	case "", "fakeConn":
-		conn = &fakeConn{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
-		}
-	case "fakeConnExt":
-		conn = &fakeConnExt{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
-		}
-	case "fakeConnCtx":
-		conn = &fakeConnCtx{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
-		}
-	default:
-		return nil, errors.New("known ConnType")
-	}
-
-	return conn, nil
-}
-
-func (c *fakeConnector) Driver() driver.Driver {
-	return c.driver
-}
-
-func convertValuesToString(args []driver.Value) string {
-	buf := new(bytes.Buffer)
-	for _, arg := range args {
-		fmt.Fprintf(buf, " %#v", arg)
-	}
-	return buf.String()
-}
-
-func convertNamedValuesToString(args []driver.NamedValue) string {
-	buf := new(bytes.Buffer)
-	for _, arg := range args {
-		fmt.Fprintf(buf, " %#v", arg)
-	}
-	return buf.String()
 }
