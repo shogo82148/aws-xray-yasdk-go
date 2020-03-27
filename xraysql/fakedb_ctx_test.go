@@ -8,11 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 )
 
 func init() {
-	sql.Register("fakedb", fdriverctx)
+	sql.Register("fakedbctx", fdriverctx)
 }
 
 func (d *fakeDriverCtx) Open(name string) (driver.Conn, error) {
@@ -33,10 +32,7 @@ func (d *fakeDriverCtx) OpenConnector(name string) (driver.Connector, error) {
 	return d.OpenConnectorWithOption(opt)
 }
 
-type fakeDriverCtx struct {
-	mu  sync.Mutex
-	dbs map[string]*fakeDB
-}
+type fakeDriverCtx fakeDriver
 
 type fakeConnector struct {
 	driver *fakeDriverCtx

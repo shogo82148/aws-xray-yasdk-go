@@ -1,6 +1,8 @@
 package xraysql
 
 import (
+	"context"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -43,9 +45,29 @@ type FakeConnOption struct {
 	Expect []FakeExpect
 }
 
+func init() {
+	sql.Register("fakedb", fdriver)
+}
+
+type fakeDriver struct {
+	mu  sync.Mutex
+	dbs map[string]*fakeDB
+}
+
+var fdriver = &fakeDriver{}
+var _ driver.Driver = fdriver
+
 type fakeDB struct {
 	mu  sync.Mutex
 	log []string
+}
+
+func (d *fakeDriver) Open(name string) (driver.Conn, error) {
+	connector, err := (*fakeDriverCtx)(d).OpenConnector(name)
+	if err != nil {
+		return nil, err
+	}
+	return connector.Connect(context.Background())
 }
 
 // fakeConn is minimum implementation of driver.Conn
