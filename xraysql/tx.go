@@ -3,7 +3,6 @@ package xraysql
 import (
 	"context"
 	"database/sql/driver"
-	"errors"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
@@ -30,7 +29,7 @@ func (tx *driverTx) Rollback() error {
 		tx.conn.attr.populate(ctx, "ROLLBACK")
 		return tx.Tx.Rollback()
 	})
-	tx.seg.AddError(errors.New("rollback"))
+	tx.seg.SetFault()
 	tx.seg.Close()
 	tx.conn.tx = nil
 	return err
