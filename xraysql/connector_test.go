@@ -20,7 +20,7 @@ func TestConnect_postgresql(t *testing.T) {
 	defer td.Close()
 
 	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
-		Name:     "TestConnect",
+		Name:     "TestConnect_postgresql",
 		ConnType: "fakeConn",
 		Expect: []FakeExpect{
 			&ExpectQuery{
@@ -85,7 +85,7 @@ func TestConnect_mysql(t *testing.T) {
 	defer td.Close()
 
 	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
-		Name:     "TestConnect",
+		Name:     "TestConnect_mysql",
 		ConnType: "fakeConn",
 		Expect: []FakeExpect{
 			&ExpectQuery{
@@ -154,7 +154,7 @@ func TestConnect_mssql(t *testing.T) {
 	defer td.Close()
 
 	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
-		Name:     "TestConnect",
+		Name:     "TestConnect_mssql",
 		ConnType: "fakeConn",
 		Expect: []FakeExpect{
 			&ExpectQuery{
@@ -227,7 +227,7 @@ func TestConnect_oracle(t *testing.T) {
 	defer td.Close()
 
 	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
-		Name:     "TestConnect",
+		Name:     "TestConnect_oracle",
 		ConnType: "fakeConn",
 		Expect: []FakeExpect{
 			&ExpectQuery{
@@ -304,7 +304,7 @@ func TestConnect_ConnContext(t *testing.T) {
 	defer td.Close()
 
 	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
-		Name:     "TestConnect",
+		Name:     "TestConnect_ConnContext",
 		ConnType: "fakeConnCtx",
 		Expect: []FakeExpect{
 			&ExpectQuery{

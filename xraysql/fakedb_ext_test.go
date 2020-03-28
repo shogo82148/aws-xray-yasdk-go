@@ -3,7 +3,6 @@ package xraysql
 import (
 	"database/sql/driver"
 	"fmt"
-	"reflect"
 )
 
 // fakeConnExt implements Execer and Queryer
@@ -18,36 +17,11 @@ var _ driver.Queryer = &fakeConnExt{}
 var _ driver.Stmt = &fakeStmtExt{}
 var _ driver.ColumnConverter = &fakeStmtExt{}
 
-// fetch next expected action.
-// v should be a pointer.
-func (c *fakeConnExt) fetchExpected(v interface{}) error {
-	ptr := reflect.ValueOf(v)
-	if ptr.Kind() != reflect.Ptr || ptr.IsNil() {
-		return fmt.Errorf("unsupported type: %v", ptr.Type())
-	}
-	ptr = ptr.Elem()
-	if len(c.expect) == 0 {
-		return fmt.Errorf("unexpected execution: want %v, got none", ptr.Type())
-	}
-	expect := reflect.ValueOf(c.expect[0])
-	c.expect = c.expect[1:]
-	if ptr.Type() != expect.Type() {
-		return fmt.Errorf("unexpected execution: want %v, got %v", ptr.Type(), expect.Type())
-	}
-	ptr.Set(expect)
-	return nil
-}
-
 func (c *fakeConnExt) Prepare(query string) (driver.Stmt, error) {
 	c.db.printf("[Conn.Prepare] %s", query)
-	var expect *ExpectQuery
-	if err := c.fetchExpected(&expect); err != nil {
-		return nil, err
-	}
 	return &fakeStmtExt{
 		db:    c.db,
-		opt:   c.opt,
-		query: expect,
+		query: query,
 	}, nil
 }
 
@@ -65,12 +39,38 @@ func (c *fakeConnExt) Begin() (driver.Tx, error) {
 
 func (c *fakeConnExt) Exec(query string, args []driver.Value) (driver.Result, error) {
 	c.db.printf("[Conn.Exec] %s %s", query, convertValuesToString(args))
-	return nil, nil
+	var expect *ExpectExec
+	if err := c.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeResult{
+		lastInsertID: expect.LastInsertID,
+		rowsAffected: expect.RowsAffected,
+	}, nil
 }
 
 func (c *fakeConnExt) Query(query string, args []driver.Value) (driver.Rows, error) {
 	c.db.printf("[Conn.Query] %s %s", query, convertValuesToString(args))
-	return &fakeRows{}, nil
+	var expect *ExpectQuery
+	if err := c.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeRows{
+		columns: expect.Columns,
+		rows:    expect.Rows,
+	}, nil
 }
 
 func (stmt *fakeStmtExt) Close() error {
@@ -79,7 +79,7 @@ func (stmt *fakeStmtExt) Close() error {
 }
 
 func (stmt *fakeStmtExt) NumInput() int {
-	return -1 // fakeDriver doesn't know its number of placeholders
+	return (*fakeStmt)(stmt).NumInput()
 }
 
 func (stmt *fakeStmtExt) Exec(args []driver.Value) (driver.Result, error) {

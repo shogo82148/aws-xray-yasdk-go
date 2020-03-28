@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -30,8 +29,17 @@ type FakeExpect interface{}
 type ExpectQuery struct {
 	Query   string
 	Err     error
+	Args    []driver.NamedValue
 	Columns []string
 	Rows    [][]driver.Value
+}
+
+type ExpectExec struct {
+	Query        string
+	Err          error
+	Args         []driver.NamedValue
+	LastInsertID int64
+	RowsAffected int64
 }
 
 // fakeConnOption is options for fake database.
@@ -58,8 +66,9 @@ var fdriver = &fakeDriver{}
 var _ driver.Driver = fdriver
 
 type fakeDB struct {
-	mu  sync.Mutex
-	log []string
+	mu     sync.Mutex
+	log    []string
+	expect []FakeExpect
 }
 
 func (d *fakeDriver) Open(name string) (driver.Conn, error) {
@@ -72,9 +81,8 @@ func (d *fakeDriver) Open(name string) (driver.Conn, error) {
 
 // fakeConn is minimum implementation of driver.Conn
 type fakeConn struct {
-	db     *fakeDB
-	opt    *FakeConnOption
-	expect []FakeExpect
+	db  *fakeDB
+	opt *FakeConnOption
 }
 
 // fakeTx is a fake transaction.
@@ -86,8 +94,12 @@ type fakeTx struct {
 // fakeStmt is minimum implementation of driver.Stmt
 type fakeStmt struct {
 	db    *fakeDB
-	opt   *FakeConnOption
-	query *ExpectQuery
+	query string
+}
+
+type fakeResult struct {
+	lastInsertID int64
+	rowsAffected int64
 }
 
 type fakeRows struct {
@@ -99,6 +111,7 @@ type fakeRows struct {
 var _ driver.Conn = &fakeConn{}
 var _ driver.Tx = &fakeTx{}
 var _ driver.Stmt = &fakeStmt{}
+var _ driver.Result = &fakeResult{}
 var _ driver.Rows = &fakeRows{}
 
 // printf write the params to the log.
@@ -117,34 +130,32 @@ func (db *fakeDB) Log() []string {
 
 // fetch next expected action.
 // v should be a pointer.
-func (c *fakeConn) fetchExpected(v interface{}) error {
+func (db *fakeDB) fetchExpected(v interface{}) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
 	ptr := reflect.ValueOf(v)
 	if ptr.Kind() != reflect.Ptr || ptr.IsNil() {
 		return fmt.Errorf("unsupported type: %v", ptr.Type())
 	}
 	ptr = ptr.Elem()
-	if len(c.expect) == 0 {
+	if len(db.expect) == 0 {
 		return fmt.Errorf("unexpected execution: want %v, got none", ptr.Type())
 	}
-	expect := reflect.ValueOf(c.expect[0])
-	c.expect = c.expect[1:]
+	expect := reflect.ValueOf(db.expect[0])
 	if ptr.Type() != expect.Type() {
 		return fmt.Errorf("unexpected execution: want %v, got %v", ptr.Type(), expect.Type())
 	}
 	ptr.Set(expect)
+	db.expect = db.expect[1:]
 	return nil
 }
 
 func (c *fakeConn) Prepare(query string) (driver.Stmt, error) {
 	c.db.printf("[Conn.Prepare] %s", query)
-	var expect *ExpectQuery
-	if err := c.fetchExpected(&expect); err != nil {
-		return nil, err
-	}
 	return &fakeStmt{
 		db:    c.db,
-		opt:   c.opt,
-		query: expect,
+		query: query,
 	}, nil
 }
 
@@ -176,26 +187,51 @@ func (stmt *fakeStmt) Close() error {
 }
 
 func (stmt *fakeStmt) NumInput() int {
-	return -1 // fakeDriver doesn't know its number of placeholders
+	return -1
 }
 
 func (stmt *fakeStmt) Exec(args []driver.Value) (driver.Result, error) {
 	stmt.db.printf("[Stmt.Exec] %s", convertValuesToString(args))
-	return nil, nil
+	var expect *ExpectExec
+	if err := stmt.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if stmt.query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, stmt.query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeResult{
+		lastInsertID: expect.LastInsertID,
+		rowsAffected: expect.RowsAffected,
+	}, nil
 }
 
 func (stmt *fakeStmt) Query(args []driver.Value) (driver.Rows, error) {
 	stmt.db.printf("[Stmt.Query] %s", convertValuesToString(args))
-	if stmt.query == nil {
-		return nil, errors.New("expected Exec, but got Query")
+	var expect *ExpectQuery
+	if err := stmt.db.fetchExpected(&expect); err != nil {
+		return nil, err
 	}
-	if stmt.query.Err != nil {
-		return nil, stmt.query.Err
+	if stmt.query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, stmt.query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
 	}
 	return &fakeRows{
-		columns: stmt.query.Columns,
-		rows:    stmt.query.Rows,
+		columns: expect.Columns,
+		rows:    expect.Rows,
 	}, nil
+}
+
+func (result *fakeResult) LastInsertId() (int64, error) {
+	return result.lastInsertID, nil
+}
+
+func (result *fakeResult) RowsAffected() (int64, error) {
+	return result.rowsAffected, nil
 }
 
 func (rows *fakeRows) Columns() []string {

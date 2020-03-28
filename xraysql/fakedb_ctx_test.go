@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 )
 
 func init() {
@@ -59,7 +58,8 @@ func (d *fakeDriverCtx) OpenConnectorWithOption(opt *FakeConnOption) (driver.Con
 	db, ok := d.dbs[opt.Name]
 	if !ok {
 		db = &fakeDB{
-			log: []string{},
+			log:    []string{},
+			expect: opt.Expect,
 		}
 		if d.dbs == nil {
 			d.dbs = make(map[string]*fakeDB)
@@ -86,21 +86,18 @@ func (c *fakeConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	switch opt.ConnType {
 	case "", "fakeConn":
 		conn = &fakeConn{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
+			db:  c.db,
+			opt: c.opt,
 		}
 	case "fakeConnExt":
 		conn = &fakeConnExt{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
+			db:  c.db,
+			opt: c.opt,
 		}
 	case "fakeConnCtx":
 		conn = &fakeConnCtx{
-			db:     c.db,
-			opt:    c.opt,
-			expect: opt.Expect,
+			db:  c.db,
+			opt: c.opt,
 		}
 	default:
 		return nil, errors.New("known ConnType")
@@ -132,26 +129,6 @@ var _ driver.ColumnConverter = &fakeStmtCtx{}
 var _ driver.StmtExecContext = &fakeStmtCtx{}
 var _ driver.StmtQueryContext = &fakeStmtCtx{}
 
-// fetch next expected action.
-// v should be a pointer.
-func (c *fakeConnCtx) fetchExpected(v interface{}) error {
-	ptr := reflect.ValueOf(v)
-	if ptr.Kind() != reflect.Ptr || ptr.IsNil() {
-		return fmt.Errorf("unsupported type: %v", ptr.Type())
-	}
-	ptr = ptr.Elem()
-	if len(c.expect) == 0 {
-		return fmt.Errorf("unexpected execution: want %v, got none", ptr.Type())
-	}
-	expect := reflect.ValueOf(c.expect[0])
-	c.expect = c.expect[1:]
-	if ptr.Type() != expect.Type() {
-		return fmt.Errorf("unexpected execution: want %v, got %v", ptr.Type(), expect.Type())
-	}
-	ptr.Set(expect)
-	return nil
-}
-
 func (c *fakeConnCtx) Ping(ctx context.Context) error {
 	c.db.printf("[Conn.Ping]")
 	return nil
@@ -163,14 +140,9 @@ func (c *fakeConnCtx) Prepare(query string) (driver.Stmt, error) {
 
 func (c *fakeConnCtx) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	c.db.printf("[Conn.PrepareContext] %s", query)
-	var expect *ExpectQuery
-	if err := c.fetchExpected(&expect); err != nil {
-		return nil, err
-	}
 	return &fakeStmtCtx{
 		db:    c.db,
-		opt:   c.opt,
-		query: expect,
+		query: query,
 	}, nil
 
 }
@@ -197,7 +169,20 @@ func (c *fakeConnCtx) Exec(query string, args []driver.Value) (driver.Result, er
 
 func (c *fakeConnCtx) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	c.db.printf("[Conn.ExecContext] %s %s", query, convertNamedValuesToString(args))
-	return nil, nil
+	var expect *ExpectExec
+	if err := c.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeResult{
+		lastInsertID: expect.LastInsertID,
+		rowsAffected: expect.RowsAffected,
+	}, nil
 }
 
 func (c *fakeConnCtx) Query(query string, args []driver.Value) (driver.Rows, error) {
@@ -206,7 +191,20 @@ func (c *fakeConnCtx) Query(query string, args []driver.Value) (driver.Rows, err
 
 func (c *fakeConnCtx) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.db.printf("[Conn.QueryContext] %s %s", query, convertNamedValuesToString(args))
-	return &fakeRows{}, nil
+	var expect *ExpectQuery
+	if err := c.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeRows{
+		columns: expect.Columns,
+		rows:    expect.Rows,
+	}, nil
 }
 
 func (stmt *fakeStmtCtx) Close() error {
@@ -224,7 +222,20 @@ func (stmt *fakeStmtCtx) Exec(args []driver.Value) (driver.Result, error) {
 
 func (stmt *fakeStmtCtx) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	stmt.db.printf("[Conn.ExecContext] %s", convertNamedValuesToString(args))
-	return nil, nil
+	var expect *ExpectExec
+	if err := stmt.db.fetchExpected(&expect); err != nil {
+		return nil, err
+	}
+	if stmt.query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, stmt.query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
+	}
+	return &fakeResult{
+		lastInsertID: expect.LastInsertID,
+		rowsAffected: expect.RowsAffected,
+	}, nil
 }
 
 func (stmt *fakeStmtCtx) Query(args []driver.Value) (driver.Rows, error) {
@@ -233,15 +244,19 @@ func (stmt *fakeStmtCtx) Query(args []driver.Value) (driver.Rows, error) {
 
 func (stmt *fakeStmtCtx) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	stmt.db.printf("[Stmt.QueryContext] %s", convertNamedValuesToString(args))
-	if stmt.query == nil {
-		return nil, errors.New("expected Exec, but got Query")
+	var expect *ExpectQuery
+	if err := stmt.db.fetchExpected(&expect); err != nil {
+		return nil, err
 	}
-	if stmt.query.Err != nil {
-		return nil, stmt.query.Err
+	if stmt.query != expect.Query {
+		return nil, fmt.Errorf("unexpected query: want %q, got %q", expect.Query, stmt.query)
+	}
+	if expect.Err != nil {
+		return nil, expect.Err
 	}
 	return &fakeRows{
-		columns: stmt.query.Columns,
-		rows:    stmt.query.Rows,
+		columns: expect.Columns,
+		rows:    expect.Rows,
 	}, nil
 }
 
