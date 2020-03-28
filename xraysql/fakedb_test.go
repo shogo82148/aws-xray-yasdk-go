@@ -246,9 +246,7 @@ func (rows *fakeRows) Next(dest []driver.Value) error {
 	if rows.idx >= len(rows.rows) {
 		return io.EOF
 	}
-	for i, v := range rows.rows[rows.idx] {
-		dest[i] = v
-	}
+	copy(dest, rows.rows[rows.idx])
 	rows.idx++
 	return nil
 }
