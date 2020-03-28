@@ -315,7 +315,7 @@ func queryRow(ctx context.Context, conn driver.Conn, query string, dest ...*stri
 
 	// scan
 	if len(dest) != len(rows.Columns()) {
-		return fmt.Errorf("xraysql: expected %d destination arguments in Scan, not %d", len(rows.Columns()), len(dest))
+		return fmt.Errorf("xraysql: expected %d destination arguments in Scan, not %d", len(dest), len(rows.Columns()))
 	}
 	cols := make([]driver.Value, len(rows.Columns()))
 	if err := rows.Next(cols); err != nil {

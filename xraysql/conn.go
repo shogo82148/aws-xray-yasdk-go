@@ -16,11 +16,7 @@ type driverConn struct {
 }
 
 func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
-	c, err := d.OpenConnector(dataSourceName)
-	if err != nil {
-		return nil, err
-	}
-	return c.Connect(context.Background())
+	panic("not supported")
 }
 
 func (conn *driverConn) Ping(ctx context.Context) error {
@@ -69,7 +65,7 @@ func (conn *driverConn) Begin() (driver.Tx, error) {
 
 func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	ctx, seg := xray.BeginSubsegment(ctx, "transaction")
-	seg.AddMetadata("tx_options", map[string]interface{}{
+	seg.AddMetadataToNamespace("sql", "tx_options", map[string]interface{}{
 		"isolation_level": sql.IsolationLevel(opts.Isolation).String(),
 		"read_only":       opts.ReadOnly,
 	})
@@ -100,6 +96,7 @@ func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 		return err
 	})
 	if err != nil {
+		seg.SetFault()
 		seg.Close()
 		return nil, err
 	}
