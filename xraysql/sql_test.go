@@ -61,10 +61,10 @@ func TestOpen_withFallbackConnector(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer db.Close()
 		if err := db.PingContext(ctx); err != nil {
 			t.Error(err)
 		}
-		defer db.Close()
 	}()
 
 	got, err := td.Recv()
@@ -136,10 +136,10 @@ func TestOpen(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer db.Close()
 		if err := db.PingContext(ctx); err != nil {
 			t.Error(err)
 		}
-		defer db.Close()
 	}()
 
 	got, err := td.Recv()

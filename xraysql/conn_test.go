@@ -45,11 +45,11 @@ func TestConn_Exec(t *testing.T) {
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		db := OpenDB(rawConnector)
+		defer db.Close()
 		_, err := db.ExecContext(ctx, "INSERT INTO products VALUES (?, ?, ?)", 1, "Cheese", 9.99)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
 	}()
 
 	got, err := td.Recv()
@@ -124,11 +124,11 @@ func TestConn_ExecContext(t *testing.T) {
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		db := OpenDB(rawConnector)
+		defer db.Close()
 		_, err := db.ExecContext(ctx, "INSERT INTO products VALUES (?, ?, ?)", 1, "Cheese", 9.99)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
 	}()
 
 	got, err := td.Recv()
@@ -207,6 +207,7 @@ func TestConn_Query(t *testing.T) {
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		db := OpenDB(rawConnector)
+		defer db.Close()
 		row := db.QueryRowContext(ctx, "SELECT id, name price FROM products WHERE id = ?", 1)
 		var (
 			id    int64
@@ -216,7 +217,6 @@ func TestConn_Query(t *testing.T) {
 		if err := row.Scan(&id, &name, &price); err != nil {
 			t.Fatal(err)
 		}
-		defer db.Close()
 	}()
 
 	got, err := td.Recv()
