@@ -116,13 +116,19 @@ func TestClient(t *testing.T) {
 					},
 					{Name: "unmarshal"},
 				},
+				AWS: schema.AWS{
+					"operation":  "ListFunctions",
+					"region":     "fake-moon-1",
+					"request_id": "",
+					"retries":    0.0,
+				},
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
+		AWS: schema.AWS{
+			"xray": map[string]interface{}{
+				"sdk_version": xray.Version,
+				"sdk":         xray.Type,
 			},
 		},
 	}
@@ -222,13 +228,19 @@ func TestClient_FailDial(t *testing.T) {
 						},
 					},
 				},
+				AWS: schema.AWS{
+					"operation":  "ListFunctions",
+					"region":     "fake-moon-1",
+					"request_id": "",
+					"retries":    0.0,
+				},
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
+		AWS: schema.AWS{
+			"xray": map[string]interface{}{
+				"sdk_version": xray.Version,
+				"sdk":         xray.Type,
 			},
 		},
 	}
@@ -338,13 +350,19 @@ func TestClient_BadRequest(t *testing.T) {
 						},
 					},
 				},
+				AWS: schema.AWS{
+					"operation":  "ListFunctions",
+					"region":     "fake-moon-1",
+					"request_id": "",
+					"retries":    0.0,
+				},
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
+		AWS: schema.AWS{
+			"xray": map[string]interface{}{
+				"sdk_version": xray.Version,
+				"sdk":         xray.Type,
 			},
 		},
 	}

@@ -12,6 +12,13 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
+var xrayData = schema.AWS{
+	"xray": map[string]interface{}{
+		"sdk_version": Version,
+		"sdk":         Type,
+	},
+}
+
 // mock time function
 func fixedTime() time.Time { return time.Date(2001, time.September, 9, 1, 46, 40, 0, time.UTC) }
 
@@ -53,12 +60,7 @@ func TestBeginSegment(t *testing.T) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		Service:   ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:       xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -94,12 +96,7 @@ func TestBeginSegmentWithRequest(t *testing.T) {
 		ParentID:  "03babb4ba280be51",
 		Type:      "subsegment",
 		Service:   ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:       xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -156,12 +153,7 @@ func TestBeginSegmentWithRequest_Sampled(t *testing.T) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		Service:   ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:       xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -200,12 +192,7 @@ func TestBeginSubsegment(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -277,12 +264,7 @@ func TestSegmentPanic(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -324,12 +306,7 @@ func TestAddError(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -397,12 +374,7 @@ func TestSegment_SetUser(t *testing.T) {
 		EndTime:   1000000000,
 		User:      "@chooblarin",
 		Service:   ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:       xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -442,12 +414,7 @@ func TestSegment_AddAnnotation(t *testing.T) {
 			"string":  "@chooblarin",
 		},
 		Service: ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

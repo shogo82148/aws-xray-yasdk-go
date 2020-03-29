@@ -17,12 +17,7 @@ func BenchmarkClient(b *testing.B) {
 		StartTime: 1000000000,
 		EndTime:   1000000000,
 		Service:   ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:       xrayData,
 	}
 
 	b.ResetTimer()

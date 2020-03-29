@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws/whitelist"
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
 )
 
@@ -169,7 +171,7 @@ var afterUnmarshal = request.NamedHandler{
 	},
 }
 
-func (segs *subsegments) afterComplete(r *request.Request) {
+func (segs *subsegments) afterComplete(r *request.Request, awsData schema.AWS) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 
@@ -188,6 +190,7 @@ func (segs *subsegments) afterComplete(r *request.Request) {
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
 
+	segs.awsSeg.SetAWS(awsData)
 	if request.IsErrorThrottle(r.Error) {
 		segs.awsSeg.SetThrottle()
 	}
@@ -205,7 +208,7 @@ func (k *contextKey) String() string { return "xrayaws context value " + k.name 
 
 var segmentsContextKey = &contextKey{"segments"}
 
-func pushHandlers(handlers *request.Handlers, completionWhitelistFilename string) {
+func pushHandlers(handlers *request.Handlers, list *whitelist.Whitelist) {
 	handlers.Validate.PushFrontNamed(beforeValidate)
 	handlers.Sign.PushFrontNamed(beforeSign)
 	handlers.Build.PushBackNamed(afterBuild)
@@ -213,7 +216,7 @@ func pushHandlers(handlers *request.Handlers, completionWhitelistFilename string
 	handlers.UnmarshalMeta.PushFrontNamed(beforeUnmarshalMeta)
 	handlers.UnmarshalError.PushBackNamed(afterUnmarshalError)
 	handlers.Unmarshal.PushBackNamed(afterUnmarshal)
-	handlers.Complete.PushBackNamed(completeHandler(completionWhitelistFilename))
+	handlers.Complete.PushBackNamed(completeHandler(list))
 }
 
 // Client adds X-Ray tracing to an AWS client.
@@ -221,18 +224,57 @@ func Client(c *client.Client) *client.Client {
 	if c == nil {
 		panic("Please initialize the provided AWS client before passing to the Client() method.")
 	}
-	pushHandlers(&c.Handlers, "")
+	pushHandlers(&c.Handlers, defaultWhitelist)
 	return c
 }
 
-func completeHandler(filename string) request.NamedHandler {
-	// TODO: parse white list
+// ClientWithWhitelist adds X-Ray tracing to an AWS client with custom whitelist.
+func ClientWithWhitelist(c *client.Client, whitelist *whitelist.Whitelist) *client.Client {
+	if c == nil {
+		panic("Please initialize the provided AWS client before passing to the Client() method.")
+	}
+	pushHandlers(&c.Handlers, whitelist)
+	return c
+}
+
+func completeHandler(list *whitelist.Whitelist) request.NamedHandler {
+	if list == nil {
+		list = &whitelist.Whitelist{
+			Services: map[string]*whitelist.Service{},
+		}
+	}
 	return request.NamedHandler{
 		Name: "XRayCompleteHandler",
 		Fn: func(r *request.Request) {
-			if segs := contextSubsegments(r.HTTPRequest.Context()); segs != nil {
-				segs.afterComplete(r)
+			segs := contextSubsegments(r.HTTPRequest.Context())
+			if segs == nil {
+				return
 			}
+			awsData := schema.AWS{
+				"region":     r.ClientInfo.SigningRegion,
+				"operation":  r.Operation.Name,
+				"retries":    r.RetryCount,
+				"request_id": r.RequestID,
+			}
+			insertParameter(awsData, r, list)
+			segs.afterComplete(r, awsData)
 		},
+	}
+}
+
+func insertParameter(aws schema.AWS, r *request.Request, list *whitelist.Whitelist) {
+	service, ok := list.Services[r.ClientInfo.ServiceName]
+	if !ok {
+		return
+	}
+	operation, ok := service.Operations[r.Operation.Name]
+	if !ok {
+		return
+	}
+	for _, key := range operation.RequestParameters {
+		_ = key // TODO: @shogo8214 implement me
+	}
+	for _, key := range operation.ResponseParameters {
+		_ = key // TODO: @shogo8214 implement me
 	}
 }
