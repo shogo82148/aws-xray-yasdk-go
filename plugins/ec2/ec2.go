@@ -3,8 +3,8 @@ package ec2
 import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 type ec2plugin struct {
@@ -24,7 +24,7 @@ func Init() {
 	}
 	xray.AddPlugin(&ec2plugin{
 		EC2: &schema.EC2{
-			InstanceID: doc.InstanceID,
+			InstanceID:       doc.InstanceID,
 			AvailabilityZone: doc.AvailabilityZone,
 		},
 	})
@@ -33,9 +33,9 @@ func Init() {
 // HandleSegment implements Plugin.
 func (p *ec2plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
-		doc.AWS = &schema.AWS{}
+		doc.AWS = schema.AWS{}
 	}
-	doc.AWS.EC2 = p.EC2
+	doc.AWS.SetEC2(p.EC2)
 }
 
 // Origin implements Plugin.

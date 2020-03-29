@@ -68,12 +68,7 @@ func TestConnect_postgresql(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -137,12 +132,7 @@ func TestConnect_mysql(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -210,12 +200,7 @@ func TestConnect_mssql(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -287,12 +272,7 @@ func TestConnect_oracle(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -352,12 +332,7 @@ func TestConnect_ConnContext(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: xray.Version,
-				Type:    xray.Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

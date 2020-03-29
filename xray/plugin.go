@@ -47,13 +47,13 @@ func init() {
 // HandleSegment implements Plugin.
 func (xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
-		doc.AWS = &schema.AWS{}
+		doc.AWS = schema.AWS{}
 	}
-	doc.AWS.XRay = &schema.XRay{
+	doc.AWS.SetXRay(&schema.XRay{
 		Version:  Version,
 		Type:     Type,
 		RuleName: seg.ruleName,
-	}
+	})
 }
 
 // Origin implements Plugin.

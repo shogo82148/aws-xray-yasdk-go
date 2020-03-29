@@ -2,6 +2,8 @@
 // ref. https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
 package schema
 
+import "strings"
+
 // The value of Segment.Origin.
 const (
 	OriginEC2Instance      = "AWS::EC2::Instance"                 // An Amazon EC2 instance.
@@ -58,7 +60,7 @@ type Segment struct {
 	HTTP *HTTP `json:"http,omitempty"`
 
 	// aws object with information about the AWS resource on which your application served the request.
-	AWS *AWS `json:"aws,omitempty"`
+	AWS AWS `json:"aws,omitempty"`
 
 	// SQL is information for queries that your application makes to an SQL database.
 	SQL *SQL `json:"sql,omitempty"`
@@ -136,36 +138,89 @@ type HTTPResponse struct {
 }
 
 // AWS is information about the AWS resource on which your application served the request.
-type AWS struct {
-	// If your application sends segments to a different AWS account, record the ID of the account running your application.
-	AccountID string `json:"account_id,omitempty"`
+type AWS map[string]interface{}
 
-	// Information about an Amazon ECS container.
-	ECS *ECS `json:"ecs,omitempty"`
+// Set set the value.
+func (aws AWS) Set(key string, value interface{}) {
+	aws[toSnakeCase(key)] = value
+}
 
-	// Information about an EC2 instance.
-	EC2 *EC2 `json:"ec2,omitempty"`
+// Get returns the value named the key.
+func (aws AWS) Get(key string) interface{} {
+	if aws == nil {
+		return nil
+	}
+	return aws[toSnakeCase(key)]
+}
 
-	// Information about X-Ray SDK.
-	XRay *XRay `json:"xray,omitempty"`
+// AccountID return the ID of the account running your application if your application sends segments to a different AWS account.
+func (aws AWS) AccountID() string {
+	if aws == nil {
+		return ""
+	}
+	v, _ := aws["account_id"].(string)
+	return v
+}
 
-	// Information about an Elastic Beanstalk environment.
-	ElasticBeanstalk *ElasticBeanstalk `json:"elastic_beanstalk,omitempty"`
+// SetAccountID sets AccountID.
+func (aws AWS) SetAccountID(accountID string) {
+	aws["account_id"] = accountID
+}
 
-	// The name of the API action invoked against an AWS service or resource.
-	Operation string `json:"operation,omitempty"`
+// ECS returns the information about an Amazon ECS container.
+func (aws AWS) ECS() *ECS {
+	if aws == nil {
+		return nil
+	}
+	v, _ := aws["ecs"].(*ECS)
+	return v
+}
 
-	// If the resource is in a region different from your application, record the region. For example, us-west-2.
-	Region string `json:"region,omitempty"`
+// SetECS sets ECS.
+func (aws AWS) SetECS(ecs *ECS) {
+	aws["ecs"] = ecs
+}
 
-	// Unique identifier for the request.
-	RequestID string `json:"request_id,omitempty"`
+// EC2 returns the information about an Amazon EC2 instance.
+func (aws AWS) EC2() *EC2 {
+	if aws == nil {
+		return nil
+	}
+	v, _ := aws["ec2"].(*EC2)
+	return v
+}
 
-	// For operations on an Amazon SQS queue, the queue's URL.
-	QueueURL string `json:"queue_url,omitempty"`
+// SetEC2 sets EC2.
+func (aws AWS) SetEC2(ec2 *EC2) {
+	aws["ec2"] = ec2
+}
 
-	// For operations on a DynamoDB table, the name of the table.
-	TableName string `json:"table_name,omitempty"`
+// ElasticBeanstalk returns the information about an Elastic Beanstalk environment.
+func (aws AWS) ElasticBeanstalk() *ElasticBeanstalk {
+	if aws == nil {
+		return nil
+	}
+	v, _ := aws["elastic_beanstalk"].(*ElasticBeanstalk)
+	return v
+}
+
+// SetElasticBeanstalk sets ElasticBeanstalk.
+func (aws AWS) SetElasticBeanstalk(bean *ElasticBeanstalk) {
+	aws["elastic_beanstalk"] = bean
+}
+
+// XRay returns the information about the X-Ray SDK.
+func (aws AWS) XRay() *XRay {
+	if aws == nil {
+		return nil
+	}
+	v, _ := aws["xray"].(*XRay)
+	return v
+}
+
+// SetXRay sets XRay.
+func (aws AWS) SetXRay(xray *XRay) {
+	aws["xray"] = xray
 }
 
 // ECS is information about an Amazon ECS container.
@@ -278,4 +333,37 @@ type SQL struct {
 
 	// "call" if the query used a PreparedCall; "statement" if the query used a PreparedStatement.
 	Preparation string `json:"preparation,omitempty"`
+}
+
+// toSnakeCase converts "ParameterName" to "parameter_name".
+// The parameter names of AWS API are ASCII-only strings,
+// toSnakeCase doesn't take care of Non-ASCII runes.
+func toSnakeCase(str string) string {
+	length := len(str)
+	for i := 0; i < len(str); i++ {
+		b := str[i]
+		if 'A' <= b && b <= 'Z' {
+			length++
+		}
+	}
+	if length == len(str) {
+		return str
+	}
+
+	var builder strings.Builder
+	builder.Grow(length)
+	if b := str[0]; 'A' <= b && b <= 'Z' {
+		builder.WriteByte(b + ('a' - 'A'))
+	} else {
+		builder.WriteByte(b)
+	}
+	for i := 1; i < len(str); i++ {
+		b := str[i]
+		if 'A' <= b && b <= 'Z' {
+			builder.WriteByte('_')
+			b += 'a' - 'A'
+		}
+		builder.WriteByte(b)
+	}
+	return builder.String()
 }

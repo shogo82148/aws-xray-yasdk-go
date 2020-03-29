@@ -31,12 +31,7 @@ func TestCapture(t *testing.T) {
 			},
 		},
 		Service: ServiceData,
-		AWS: &schema.AWS{
-			XRay: &schema.XRay{
-				Version: Version,
-				Type:    Type,
-			},
-		},
+		AWS:     xrayData,
 	}
 	got, err := td.Recv()
 	if err != nil {

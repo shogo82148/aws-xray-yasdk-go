@@ -71,8 +71,8 @@ func TestStreamingStrategyBatchAll(t *testing.T) {
 			StartTime: 1000000000,
 			EndTime:   1000000001,
 			Service:   ServiceData,
-			AWS: &schema.AWS{
-				XRay: &schema.XRay{
+			AWS: schema.AWS{
+				"xray": &schema.XRay{
 					Version: Version,
 					Type:    Type,
 				},
@@ -183,8 +183,8 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 				StartTime:  1000000000,
 				InProgress: true,
 				Service:    ServiceData,
-				AWS: &schema.AWS{
-					XRay: &schema.XRay{
+				AWS: schema.AWS{
+					"xray": &schema.XRay{
 						Version: Version,
 						Type:    Type,
 					},

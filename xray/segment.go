@@ -107,6 +107,7 @@ type Segment struct {
 	annotations map[string]interface{}
 	sql         *schema.SQL
 	http        *schema.HTTP
+	aws         schema.AWS
 }
 
 // NewTraceID generates a string format of random trace ID.
@@ -543,6 +544,26 @@ func (seg *Segment) SetHTTPResponse(response *schema.HTTPResponse) {
 // SetHTTPResponse sets the information of HTTP requests.
 func SetHTTPResponse(ctx context.Context, response *schema.HTTPResponse) {
 	ContextSegment(ctx).SetHTTPResponse(response)
+}
+
+// SetAWS sets the information about the AWS resource on which your application served the request.
+func (seg *Segment) SetAWS(awsData schema.AWS) {
+	if seg == nil {
+		return
+	}
+	seg.mu.Lock()
+	defer seg.mu.Unlock()
+	if seg.aws == nil {
+		seg.aws = schema.AWS{}
+	}
+	for key, value := range awsData {
+		seg.aws.Set(key, value)
+	}
+}
+
+// SetAWS sets the information about the AWS resource on which your application served the request.
+func SetAWS(ctx context.Context, awsData schema.AWS) {
+	ContextSegment(ctx).SetAWS(awsData)
 }
 
 // SetUser sets a user id.
