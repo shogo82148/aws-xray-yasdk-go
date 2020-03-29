@@ -453,3 +453,29 @@ func TestSegment_AddAnnotation(t *testing.T) {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
 }
+
+func BenchmarkBeginSegment(b *testing.B) {
+	ctx, td := NewNullDaemon()
+	defer td.Close()
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		ctx, seg := BeginSegment(ctx, "foobar")
+		_ = ctx // do something using ctx
+		seg.Close()
+	}
+}
+
+func BenchmarkBeginSegmentParallel(b *testing.B) {
+	ctx, td := NewNullDaemon()
+	defer td.Close()
+
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			ctx, seg := BeginSegment(ctx, "foobar")
+			_ = ctx // do something using ctx
+			seg.Close()
+		}
+	})
+}

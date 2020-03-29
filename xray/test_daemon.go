@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/ctxmissing"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
@@ -137,4 +138,57 @@ func (td *TestDaemon) Recv() (*schema.Segment, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+// NullDaemon receives segment documents, but ignore them.
+type NullDaemon struct {
+	conn      net.PacketConn
+	ctx       context.Context
+	cancel    context.CancelFunc
+	closeOnce sync.Once
+}
+
+// NewNullDaemon creates new NullDaemon.
+func NewNullDaemon() (context.Context, *NullDaemon) {
+	conn, err := net.ListenPacket("udp", "127.0.0.1:0")
+	if err != nil {
+		if conn, err = net.ListenPacket("udp6", "[::1]:0"); err != nil {
+			panic(fmt.Sprintf("xray: failed to listen: %v", err))
+		}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	d := &NullDaemon{
+		conn:   conn,
+		ctx:    ctx,
+		cancel: cancel,
+	}
+	address := "udp:" + conn.LocalAddr().String()
+
+	ctx = context.WithValue(ctx, clientContextKey, New(&Config{
+		DaemonAddress:          address,
+		SamplingStrategy:       sampling.NewAllStrategy(),
+		ContextMissingStrategy: &ctxmissing.LogErrorStrategy{},
+	}))
+
+	go d.run()
+	return ctx, d
+}
+
+func (td *NullDaemon) run() {
+	buffer := make([]byte, 64*1024)
+	for {
+		td.conn.ReadFrom(buffer)
+		select {
+		case <-td.ctx.Done():
+			return
+		}
+	}
+}
+
+// Close shutdowns the daemon.
+func (td *NullDaemon) Close() {
+	td.closeOnce.Do(func() {
+		td.cancel()
+		td.conn.Close()
+	})
 }
