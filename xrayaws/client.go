@@ -39,10 +39,9 @@ func (segs *subsegments) beforeValidate(r *request.Request) {
 	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, r.ClientInfo.ServiceName)
 	segs.awsSeg.SetNamespace("aws")
 	r.HTTPRequest = r.HTTPRequest.WithContext(segs.awsCtx)
+	r.HTTPRequest.Header.Set(xray.TraceIDHeaderKey, xray.DownstreamHeader(segs.awsCtx).String())
 
 	segs.marshalCtx, segs.marshalSeg = xray.BeginSubsegment(segs.awsCtx, "marshal")
-
-	// TODO: set x-amzn-trace-id header
 }
 
 var beforeValidate = request.NamedHandler{
