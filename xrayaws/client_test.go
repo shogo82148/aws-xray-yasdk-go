@@ -117,6 +117,12 @@ func TestClient(t *testing.T) {
 					},
 					{Name: "unmarshal"},
 				},
+				HTTP: &schema.HTTP{
+					Response: &schema.HTTPResponse{
+						Status:        200,
+						ContentLength: 2,
+					},
+				},
 				AWS: schema.AWS{
 					"operation":  "ListFunctions",
 					"region":     "fake-moon-1",
@@ -228,6 +234,9 @@ func TestClient_FailDial(t *testing.T) {
 							},
 						},
 					},
+				},
+				HTTP: &schema.HTTP{
+					Response: &schema.HTTPResponse{},
 				},
 				AWS: schema.AWS{
 					"operation":  "ListFunctions",
@@ -349,6 +358,12 @@ func TestClient_BadRequest(t *testing.T) {
 								},
 							},
 						},
+					},
+				},
+				HTTP: &schema.HTTP{
+					Response: &schema.HTTPResponse{
+						Status:        400,
+						ContentLength: 2,
 					},
 				},
 				AWS: schema.AWS{
