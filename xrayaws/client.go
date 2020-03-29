@@ -10,6 +10,8 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
 )
 
+//go:generate go run codegen.go
+
 type subsegments struct {
 	mu            sync.Mutex
 	ctx           context.Context
