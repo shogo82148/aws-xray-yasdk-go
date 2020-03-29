@@ -3,6 +3,13 @@ Yet Another [AWS X-Ray](https://aws.amazon.com/xray/) SDK for Go
 
 The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
 
+## TODO
+
+- configure from the code
+- implement ECS plugin
+- implement EKS plugin
+- implement beanstalk plugin
+
 ## Quick Start
 
 ### Start a custom segment/subsegment
