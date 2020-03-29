@@ -352,10 +352,16 @@ func toSnakeCase(str string) string {
 
 	var builder strings.Builder
 	builder.Grow(length)
-	for i := 0; i < len(str); i++ {
+	if b := str[0]; 'A' <= b && b <= 'Z' {
+		builder.WriteByte(b + ('a' - 'A'))
+	} else {
+		builder.WriteByte(b)
+	}
+	for i := 1; i < len(str); i++ {
 		b := str[i]
-		if i != 0 && 'A' <= b && b <= 'Z' {
+		if 'A' <= b && b <= 'Z' {
 			builder.WriteByte('_')
+			b += 'a' - 'A'
 		}
 		builder.WriteByte(b)
 	}
