@@ -191,6 +191,17 @@ func (segs *subsegments) afterComplete(r *request.Request, awsData schema.AWS) {
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
 
+	if resp := r.HTTPResponse; resp != nil {
+		segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
+			Status:        resp.StatusCode,
+			ContentLength: resp.ContentLength,
+		})
+
+		// record the s3 extend request id.
+		if ext := resp.Header.Get("x-amz-id-2"); ext != "" {
+			awsData.Set("id_2", ext)
+		}
+	}
 	segs.awsSeg.SetAWS(awsData)
 	if request.IsErrorThrottle(r.Error) {
 		segs.awsSeg.SetThrottle()
