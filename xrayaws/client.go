@@ -2,6 +2,7 @@ package xrayaws
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	"github.com/aws/aws-sdk-go/aws/client"
@@ -272,9 +273,68 @@ func insertParameter(aws schema.AWS, r *request.Request, list *whitelist.Whiteli
 		return
 	}
 	for _, key := range operation.RequestParameters {
-		_ = key // TODO: @shogo8214 implement me
+		aws.Set(key, getValue(r.Params, key))
+	}
+	for key, desc := range operation.RequestDescriptors {
+		insertDescriptor(desc, aws, r.Params, key)
 	}
 	for _, key := range operation.ResponseParameters {
-		_ = key // TODO: @shogo8214 implement me
+		aws.Set(key, getValue(r.Data, key))
+	}
+	for key, desc := range operation.ResponseDescriptors {
+		insertDescriptor(desc, aws, r.Data, key)
+	}
+}
+
+func getValue(v interface{}, key string) interface{} {
+	v1 := reflect.ValueOf(v)
+	if v1.Kind() == reflect.Ptr {
+		v1 = v1.Elem()
+	}
+	if v1.Kind() != reflect.Struct {
+		return nil
+	}
+	typ := v1.Type()
+
+	// i starts 1 because first field is always struct{}
+	for i := 1; i < v1.NumField(); i++ {
+		if typ.Field(i).Name == key {
+			return v1.Field(i).Interface()
+		}
+	}
+	return nil
+}
+
+func insertDescriptor(desc *whitelist.Descriptor, aws schema.AWS, v interface{}, key string) {
+	renameTo := desc.RenameTo
+	if renameTo == "" {
+		renameTo = key
+	}
+	value := getValue(v, key)
+	switch {
+	case desc.Map:
+		if !desc.GetKeys {
+			return
+		}
+		val := reflect.ValueOf(value)
+		if val.Kind() != reflect.Map {
+			return
+		}
+		keySlice := make([]interface{}, 0, val.Len())
+		for _, key := range val.MapKeys() {
+			keySlice = append(keySlice, key.Interface())
+		}
+		aws.Set(renameTo, keySlice)
+	case desc.List:
+		if !desc.GetCount {
+			return
+		}
+		val := reflect.ValueOf(value)
+		if kind := val.Kind(); kind != reflect.Slice && kind != reflect.Array {
+			return
+		}
+		aws.Set(renameTo, val.Len())
+	default:
+		aws.Set(renameTo, value)
 	}
 }
