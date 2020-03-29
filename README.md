@@ -10,6 +10,15 @@ The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
 - implement EKS plugin
 - implement beanstalk plugin
 
+## Configuration
+
+### Environment Values
+
+- `AWS_XRAY_DAEMON_ADDRESS`: Set the host and port of the X-Ray daemon listener. By default, the SDK uses `127.0.0.1:2000` for both trace data (UDP) and sampling (TCP).
+- `AWS_XRAY_CONTEXT_MISSING`: `LOG_ERROR` or `RUNTIME_ERROR`. The default value is `LOG_ERROR`.
+- `AWS_XRAY_TRACING_NAME`: Set a service name that the SDK uses for segments.
+- `AWS_XRAY_DEBUG_MODE`: Set to `TRUE` to configure the SDK to output logs to the console
+
 ## Quick Start
 
 ### Start a custom segment/subsegment
