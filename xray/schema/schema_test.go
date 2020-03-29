@@ -9,6 +9,7 @@ func TestToSnakeCase(t *testing.T) {
 	}{
 		{in: "ParameterName", want: "parameter_name"},
 		{in: "parameter_name", want: "parameter_name"},
+		{in: "parameterName", want: "parameter_name"},
 	}
 
 	for _, tt := range tc {
