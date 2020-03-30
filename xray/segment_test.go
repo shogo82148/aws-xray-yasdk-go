@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,6 +36,25 @@ func TestNewSegmentID(t *testing.T) {
 	pattern := `^[0-9a-fA-F]{16}$`
 	if matched, err := regexp.MatchString(pattern, id); err != nil || !matched {
 		t.Errorf("id should match %q, but got %q", pattern, id)
+	}
+}
+
+func TestSanitizeSegmentName(t *testing.T) {
+	tc := []struct {
+		in   string
+		want string
+	}{
+		{in: "abc 123", want: "abc 123"},
+		{in: `_.:/%&#=+\-@`, want: `_.:/%&#=+\-@`},
+		{in: "abc!?[](){}123", want: "abc123"},
+		{in: "こんにちは世界", want: "こんにちは世界"},
+		{in: strings.Repeat("あ", 201), want: strings.Repeat("あ", 200)},
+	}
+	for _, tt := range tc {
+		got := sanitizeSegmentName(tt.in)
+		if got != tt.want {
+			t.Errorf("%q: want %q, got %q", tt.in, tt.want, got)
+		}
 	}
 }
 
