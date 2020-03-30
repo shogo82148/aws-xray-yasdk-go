@@ -256,22 +256,22 @@ func (segs *httpSubsegments) Cancel() {
 		segs.dnsSeg.Close()
 		segs.dnsCtx, segs.dnsSeg = nil, nil
 	}
-	if segs.dialSeg != nil {
+	if segs.dialCtx != nil {
 		segs.dialSeg.AddError(context.Canceled)
 		segs.dialSeg.Close()
 		segs.dialCtx, segs.dialSeg = nil, nil
 	}
-	if segs.tlsSeg != nil {
+	if segs.tlsCtx != nil {
 		segs.tlsSeg.AddError(context.Canceled)
 		segs.tlsSeg.Close()
 		segs.tlsCtx, segs.tlsSeg = nil, nil
 	}
-	if segs.connSeg != nil {
+	if segs.connCtx != nil {
 		segs.connSeg.AddError(context.Canceled)
 		segs.connSeg.Close()
 		segs.connCtx, segs.connSeg = nil, nil
 	}
-	if segs.reqSeg != nil {
+	if segs.reqCtx != nil {
 		segs.reqSeg.AddError(context.Canceled)
 		segs.reqSeg.Close()
 		segs.reqCtx, segs.reqSeg = nil, nil
