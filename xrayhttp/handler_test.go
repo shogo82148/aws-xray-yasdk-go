@@ -23,6 +23,41 @@ var xrayData = schema.AWS{
 // compile time checking to satisfy the interface
 // https://golang.org/doc/effective_go.html#blank_implements
 var _ http.ResponseWriter = (*responseTracer)(nil)
+var _ TracingNamer = FixedTracingNamer("")
+var _ TracingNamer = DynamicTracingNamer{}
+
+func TestFixedTracingNamer(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	namer := FixedTracingNamer("segment-name")
+	name := namer.TracingName(req)
+	if name != "segment-name" {
+		t.Errorf("want %s, got %s", "segment-name", name)
+	}
+}
+
+func TestDynamicTracingNamer(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Run("match", func(t *testing.T) {
+		namer := DynamicTracingNamer{RecognizedHosts: "*"}
+		name := namer.TracingName(req)
+		if name != "example.com" {
+			t.Errorf("want %s, got %s", "example.com", name)
+		}
+	})
+	t.Run("fallback", func(t *testing.T) {
+		namer := DynamicTracingNamer{RecognizedHosts: "some.invalid", FallbackName: "fallback"}
+		name := namer.TracingName(req)
+		if name != "fallback" {
+			t.Errorf("want %s, got %s", "fallback", name)
+		}
+	})
+}
 
 func TestHandler(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
