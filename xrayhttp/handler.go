@@ -21,6 +21,7 @@ type TracingNamer interface {
 }
 
 // FixedTracingNamer records the fixed name of service node.
+// If it is empty string, the value of AWS_XRAY_TRACING_NAME environment value is used.
 type FixedTracingNamer string
 
 // TracingName implements TracingNamer.
@@ -37,6 +38,8 @@ func (tn FixedTracingNamer) TracingName(r *http.Request) string {
 // recognized pattern (using the included pattern package),
 // it is used as the segment name. Otherwise, the fallback
 // name is used.
+// If the fallback name is empty string,
+// the value of AWS_XRAY_TRACING_NAME environment value is used.
 type DynamicTracingNamer struct {
 	FallbackName    string
 	RecognizedHosts string
