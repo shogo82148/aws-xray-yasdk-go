@@ -31,19 +31,19 @@ func (tn FixedTracingNamer) TracingName(r *http.Request) string {
 	return os.Getenv("AWS_XRAY_TRACING_NAME")
 }
 
-// DynamicSegmentNamer chooses names for segments generated
+// DynamicTracingNamer chooses names for segments generated
 // for incoming requests by parsing the HOST header of the
 // incoming request. If the host header matches a given
 // recognized pattern (using the included pattern package),
 // it is used as the segment name. Otherwise, the fallback
 // name is used.
-type DynamicSegmentNamer struct {
+type DynamicTracingNamer struct {
 	FallbackName    string
 	RecognizedHosts string
 }
 
 // TracingName implements TracingNamer.
-func (tn *DynamicSegmentNamer) TracingName(r *http.Request) string {
+func (tn *DynamicTracingNamer) TracingName(r *http.Request) string {
 	if sampling.WildcardMatchCaseInsensitive(tn.RecognizedHosts, r.Host) {
 		return r.Host
 	}
