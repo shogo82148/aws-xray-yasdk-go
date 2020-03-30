@@ -96,7 +96,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	seg.SetHTTPRequest(requestInfo)
 
-	rw := &responseTracer{rw: w, seg: seg}
+	rw := &serverResponseTracer{rw: w, seg: seg}
 	tracer.h.ServeHTTP(wrap(rw), r)
 	if rw.hijacked {
 		return
@@ -157,7 +157,7 @@ type responseWriter interface {
 	stringWriter
 }
 
-type responseTracer struct {
+type serverResponseTracer struct {
 	seg      *xray.Segment
 	rw       http.ResponseWriter
 	status   int
@@ -165,11 +165,11 @@ type responseTracer struct {
 	hijacked bool
 }
 
-func (rw *responseTracer) Header() http.Header {
+func (rw *serverResponseTracer) Header() http.Header {
 	return rw.rw.Header()
 }
 
-func (rw *responseTracer) Write(b []byte) (int, error) {
+func (rw *serverResponseTracer) Write(b []byte) (int, error) {
 	if rw.status == 0 {
 		rw.WriteHeader(http.StatusOK)
 	}
@@ -178,12 +178,12 @@ func (rw *responseTracer) Write(b []byte) (int, error) {
 	return size, err
 }
 
-func (rw *responseTracer) WriteHeader(s int) {
+func (rw *serverResponseTracer) WriteHeader(s int) {
 	rw.rw.WriteHeader(s)
 	rw.status = s
 }
 
-func (rw *responseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h := rw.rw.(http.Hijacker)
 	conn, buf, err := h.Hijack()
 	if err == nil {
@@ -203,25 +203,25 @@ func (rw *responseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return conn, buf, err
 }
 
-func (rw *responseTracer) Flush() {
+func (rw *serverResponseTracer) Flush() {
 	if f, ok := rw.rw.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-func (rw *responseTracer) Push(target string, opts *http.PushOptions) error {
+func (rw *serverResponseTracer) Push(target string, opts *http.PushOptions) error {
 	if p, ok := rw.rw.(http.Pusher); ok {
 		return p.Push(target, opts)
 	}
 	return http.ErrNotSupported
 }
 
-func (rw *responseTracer) CloseNotify() <-chan bool {
+func (rw *serverResponseTracer) CloseNotify() <-chan bool {
 	n := rw.rw.(http.CloseNotifier)
 	return n.CloseNotify()
 }
 
-func (rw *responseTracer) WriteString(str string) (int, error) {
+func (rw *serverResponseTracer) WriteString(str string) (int, error) {
 	var size int
 	var err error
 	if s, ok := rw.rw.(stringWriter); ok {
@@ -233,7 +233,7 @@ func (rw *responseTracer) WriteString(str string) (int, error) {
 	return size, err
 }
 
-func (rw *responseTracer) ReadFrom(src io.Reader) (int64, error) {
+func (rw *serverResponseTracer) ReadFrom(src io.Reader) (int64, error) {
 	var size int64
 	var err error
 	if r, ok := rw.rw.(io.ReaderFrom); ok {
