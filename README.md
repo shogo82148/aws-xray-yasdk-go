@@ -76,7 +76,7 @@ func getExample(ctx context.Context) ([]byte, error) {
 ```go
 sess := session.Must(session.NewSession())
 dynamo := dynamodb.New(sess)
-xrayaws.AWS(dynamo.Client)
+xrayaws.Client(dynamo.Client)
 dynamo.ListTablesWithContext(ctx, &dynamodb.ListTablesInput{})
 ```
 
