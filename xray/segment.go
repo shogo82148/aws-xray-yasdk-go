@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
@@ -58,6 +60,28 @@ func origin() string {
 		}
 	}
 	return org
+}
+
+// segment name should match /\A[\p{L}\p{N}\p{Z}_.:\/%&#=+\-@]{1,200}\z/
+func sanitizeSegmentName(name string) string {
+	var builder strings.Builder
+	builder.Grow(len(name))
+	var length int
+	for _, r := range name {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsSpace(r) {
+			builder.WriteRune(r)
+		} else if r <= unicode.MaxASCII && strings.IndexByte(`_.:/%&#=+\-@`, byte(r)) >= 0 {
+			builder.WriteRune(r)
+		} else {
+			// ignore invalid charactors
+			continue
+		}
+		length++
+		if length >= 200 {
+			break
+		}
+	}
+	return builder.String()
 }
 
 // Segment is a segment.
@@ -157,7 +181,7 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) (context.Context, *Segment) {
 	seg := &Segment{
 		ctx:           ctx,
-		name:          name, // TODO: @shogo82148 sanitize the name
+		name:          sanitizeSegmentName(name),
 		id:            NewSegmentID(),
 		startTime:     nowFunc(),
 		totalSegments: 1,
@@ -243,7 +267,7 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	root := parent.root
 	seg := &Segment{
 		ctx:       ctx,
-		name:      name, // TODO: @shogo82148 sanitize the name
+		name:      sanitizeSegmentName(name),
 		id:        NewSegmentID(),
 		parent:    parent,
 		root:      root,
