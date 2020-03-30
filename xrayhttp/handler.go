@@ -16,20 +16,17 @@ import (
 //go:generate go run codegen.go
 
 // TracingNamer is the interface for naming service node.
+// If it returns empty string, the value of AWS_XRAY_TRACING_NAME environment value is used.
 type TracingNamer interface {
 	TracingName(r *http.Request) string
 }
 
 // FixedTracingNamer records the fixed name of service node.
-// If it is empty string, the value of AWS_XRAY_TRACING_NAME environment value is used.
 type FixedTracingNamer string
 
 // TracingName implements TracingNamer.
 func (tn FixedTracingNamer) TracingName(r *http.Request) string {
-	if tn != "" {
-		return string(tn)
-	}
-	return os.Getenv("AWS_XRAY_TRACING_NAME")
+	return string(tn)
 }
 
 // DynamicTracingNamer chooses names for segments generated
@@ -38,22 +35,17 @@ func (tn FixedTracingNamer) TracingName(r *http.Request) string {
 // recognized pattern (using the included pattern package),
 // it is used as the segment name. Otherwise, the fallback
 // name is used.
-// If the fallback name is empty string,
-// the value of AWS_XRAY_TRACING_NAME environment value is used.
 type DynamicTracingNamer struct {
-	FallbackName    string
 	RecognizedHosts string
+	FallbackName    string
 }
 
 // TracingName implements TracingNamer.
-func (tn *DynamicTracingNamer) TracingName(r *http.Request) string {
+func (tn DynamicTracingNamer) TracingName(r *http.Request) string {
 	if sampling.WildcardMatchCaseInsensitive(tn.RecognizedHosts, r.Host) {
 		return r.Host
 	}
-	if tn.FallbackName != "" {
-		return tn.FallbackName
-	}
-	return os.Getenv("AWS_XRAY_TRACING_NAME")
+	return tn.FallbackName
 }
 
 type httpTracer struct {
@@ -81,6 +73,12 @@ func HandlerWithClient(tn TracingNamer, client *xray.Client, h http.Handler) htt
 
 func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := tracer.tn.TracingName(r)
+	if name == "" {
+		name = os.Getenv("AWS_XRAY_TRACING_NAME")
+		if name == "" {
+			name = "unknown"
+		}
+	}
 	ctx := r.Context()
 	if tracer.client != nil {
 		ctx = xray.WithClient(ctx, tracer.client)
