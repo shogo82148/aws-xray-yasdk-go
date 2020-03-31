@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,6 +28,21 @@ func init() {
 	level := LogLevelInfo
 	if os.Getenv("AWS_XRAY_DEBUG_MODE") != "" {
 		level = LogLevelDebug
+	} else if env := os.Getenv("AWS_XRAY_LOG_LEVEL"); env != "" {
+		env = strings.ToLower(env)
+		switch env {
+		case "debug":
+			level = LogLevelDebug
+		case "info":
+			level = LogLevelInfo
+		case "warn":
+			level = LogLevelWarn
+		case "error":
+			level = LogLevelError
+		case "silent":
+			globalLogger = NullLogger{}
+			return
+		}
 	}
 	globalLogger = NewDefaultLogger(os.Stderr, level)
 }
@@ -135,6 +151,14 @@ func (l *defaultLogger) Log(level LogLevel, msg string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	l.w.Write(buf.Bytes())
+}
+
+// NullLogger suppress all logs.
+type NullLogger struct{}
+
+// Log implements Logger.
+func (NullLogger) Log(level LogLevel, msg string) {
+	// do nothing
 }
 
 // Info outputs info level log message.
