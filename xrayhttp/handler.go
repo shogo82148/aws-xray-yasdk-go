@@ -200,16 +200,12 @@ func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 			rw.status = http.StatusSwitchingProtocols
 		}
 		rw.hijacked = true
-		if rw.respCtx != nil {
-			rw.respSeg.Close()
-			rw.respCtx, rw.respSeg = nil, nil
-		}
 		responseInfo := &schema.HTTPResponse{
 			Status:        rw.status,
 			ContentLength: rw.size,
 		}
 		rw.seg.SetHTTPResponse(responseInfo)
-		rw.seg.Close()
+		rw.close()
 	}
 	return conn, buf, err
 }
