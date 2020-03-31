@@ -1,25 +1,28 @@
-package ecs
+package eks
 
 import (
 	"os"
 	"runtime"
-	"strings"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
+const (
+	caCertificateFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+	tokenFile         = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+)
+
 type plugin struct {
-	ECS *schema.ECS
+	EKS *schema.EKS
 }
 
-// Init activates ECS Plugin at runtime.
+// Init activates EKS Plugin at runtime.
 func Init() {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	uri := os.Getenv("ECS_CONTAINER_METADATA_URI")
-	if !strings.HasPrefix(uri, "http://") {
+	if _, err := os.Stat(tokenFile); err != nil {
 		return
 	}
 	hostname, err := os.Hostname()
@@ -27,8 +30,10 @@ func Init() {
 		return
 	}
 	xray.AddPlugin(&plugin{
-		ECS: &schema.ECS{
-			Container: hostname,
+		EKS: &schema.EKS{
+			ClusterName: "", // TODO
+			ContainerID: "", // TODO
+			Pod:         hostname,
 		},
 	})
 }
@@ -38,8 +43,8 @@ func (p *plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
 		doc.AWS = schema.AWS{}
 	}
-	doc.AWS.SetECS(p.ECS)
+	doc.AWS.SetEKS(p.EKS)
 }
 
 // Origin implements Plugin.
-func (*plugin) Origin() string { return schema.OriginECSContainer }
+func (*plugin) Origin() string { return schema.OriginEKSContainer }
