@@ -5,7 +5,6 @@ The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
 
 ## TODO
 
-- configure from the code
 - implement ECS plugin
 - implement EKS plugin
 - implement beanstalk plugin
@@ -19,6 +18,21 @@ The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
 - `AWS_XRAY_TRACING_NAME`: Set a service name that the SDK uses for segments.
 - `AWS_XRAY_DEBUG_MODE`: Set to `TRUE` to configure the SDK to output logs to the console
 - `AWS_XRAY_LOG_LEVEL`: Set a log level for the SDK built in logger. it should be `debug`, `info`, `warn`, `error` or `silent`. This value is ignored if `AWS_XRAY_DEBUG_MODE` is set.
+
+### Code
+
+These configure overwrites the environment configure.
+
+```go
+// configure the daemon address and the context missing strategy.
+xray.Configure(&xray.Config{
+  DaemonAddress:          "127.0.0.1:2000",
+  ContextMissingStrategy: &ctxmissing.RuntimeErrorStrategy{},
+})
+
+// configure the default logger.
+xraylog.SetLogger(NewDefaultLogger(os.Stderr, xraylog.LogLevelDebug))
+```
 
 ## Quick Start
 

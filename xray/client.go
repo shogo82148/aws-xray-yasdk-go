@@ -24,6 +24,13 @@ var dialer = net.Dialer{
 
 var defaultClient = New(nil)
 
+// Configure relaces the default client with the cfg.
+func Configure(cfg *Config) {
+	client := New(cfg)
+	defaultClient.Close()
+	defaultClient = client
+}
+
 // ContextClient returns the client of current context.
 func ContextClient(ctx context.Context) *Client {
 	if client := ctx.Value(clientContextKey); client != nil {
