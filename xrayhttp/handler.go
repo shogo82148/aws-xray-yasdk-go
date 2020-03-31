@@ -2,6 +2,7 @@ package xrayhttp
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -96,7 +97,8 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	seg.SetHTTPRequest(requestInfo)
 
-	rw := &responseTracer{rw: w, seg: seg}
+	rw := &serverResponseTracer{rw: w, ctx: ctx, seg: seg}
+	defer rw.close()
 	tracer.h.ServeHTTP(wrap(rw), r)
 	if rw.hijacked {
 		return
@@ -116,7 +118,6 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if rw.status >= 500 && rw.status < 600 {
 		seg.SetFault()
 	}
-	seg.Close()
 }
 
 func getURL(r *http.Request) string {
@@ -157,19 +158,22 @@ type responseWriter interface {
 	stringWriter
 }
 
-type responseTracer struct {
+type serverResponseTracer struct {
+	ctx      context.Context
 	seg      *xray.Segment
+	respCtx  context.Context
+	respSeg  *xray.Segment
 	rw       http.ResponseWriter
 	status   int
 	size     int64
 	hijacked bool
 }
 
-func (rw *responseTracer) Header() http.Header {
+func (rw *serverResponseTracer) Header() http.Header {
 	return rw.rw.Header()
 }
 
-func (rw *responseTracer) Write(b []byte) (int, error) {
+func (rw *serverResponseTracer) Write(b []byte) (int, error) {
 	if rw.status == 0 {
 		rw.WriteHeader(http.StatusOK)
 	}
@@ -178,12 +182,15 @@ func (rw *responseTracer) Write(b []byte) (int, error) {
 	return size, err
 }
 
-func (rw *responseTracer) WriteHeader(s int) {
+func (rw *serverResponseTracer) WriteHeader(s int) {
+	if rw.respCtx == nil {
+		rw.respCtx, rw.respSeg = xray.BeginSubsegment(rw.ctx, "response")
+	}
 	rw.rw.WriteHeader(s)
 	rw.status = s
 }
 
-func (rw *responseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h := rw.rw.(http.Hijacker)
 	conn, buf, err := h.Hijack()
 	if err == nil {
@@ -198,30 +205,30 @@ func (rw *responseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 			ContentLength: rw.size,
 		}
 		rw.seg.SetHTTPResponse(responseInfo)
-		rw.seg.Close()
+		rw.close()
 	}
 	return conn, buf, err
 }
 
-func (rw *responseTracer) Flush() {
+func (rw *serverResponseTracer) Flush() {
 	if f, ok := rw.rw.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-func (rw *responseTracer) Push(target string, opts *http.PushOptions) error {
+func (rw *serverResponseTracer) Push(target string, opts *http.PushOptions) error {
 	if p, ok := rw.rw.(http.Pusher); ok {
 		return p.Push(target, opts)
 	}
 	return http.ErrNotSupported
 }
 
-func (rw *responseTracer) CloseNotify() <-chan bool {
+func (rw *serverResponseTracer) CloseNotify() <-chan bool {
 	n := rw.rw.(http.CloseNotifier)
 	return n.CloseNotify()
 }
 
-func (rw *responseTracer) WriteString(str string) (int, error) {
+func (rw *serverResponseTracer) WriteString(str string) (int, error) {
 	var size int
 	var err error
 	if s, ok := rw.rw.(stringWriter); ok {
@@ -233,7 +240,7 @@ func (rw *responseTracer) WriteString(str string) (int, error) {
 	return size, err
 }
 
-func (rw *responseTracer) ReadFrom(src io.Reader) (int64, error) {
+func (rw *serverResponseTracer) ReadFrom(src io.Reader) (int64, error) {
 	var size int64
 	var err error
 	if r, ok := rw.rw.(io.ReaderFrom); ok {
@@ -243,4 +250,23 @@ func (rw *responseTracer) ReadFrom(src io.Reader) (int64, error) {
 	}
 	rw.size += size
 	return size, err
+}
+
+func (rw *serverResponseTracer) close() {
+	err := recover()
+	if rw.respCtx != nil {
+		if err != nil {
+			rw.respSeg.SetFault()
+		}
+		rw.respSeg.Close()
+		rw.respCtx, rw.respSeg = nil, nil
+	}
+	if rw.ctx != nil {
+		rw.seg.AddPanic(err)
+		rw.seg.Close()
+		rw.ctx, rw.seg = nil, nil
+	}
+	if err != nil {
+		panic(err)
+	}
 }

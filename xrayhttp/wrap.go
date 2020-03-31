@@ -4,7 +4,7 @@ package xrayhttp
 
 import "net/http"
 
-func wrap(rw *responseTracer) http.ResponseWriter {
+func wrap(rw *serverResponseTracer) http.ResponseWriter {
 	var n uint
 	if _, ok := rw.rw.(http.Flusher); ok {
 		n |= 0x1

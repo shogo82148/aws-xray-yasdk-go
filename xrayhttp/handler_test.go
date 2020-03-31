@@ -1,10 +1,12 @@
 package xrayhttp
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -22,7 +24,7 @@ var xrayData = schema.AWS{
 
 // compile time checking to satisfy the interface
 // https://golang.org/doc/effective_go.html#blank_implements
-var _ http.ResponseWriter = (*responseTracer)(nil)
+var _ http.ResponseWriter = (*serverResponseTracer)(nil)
 var _ TracingNamer = FixedTracingNamer("")
 var _ TracingNamer = DynamicTracingNamer{}
 
@@ -104,6 +106,9 @@ func TestHandler(t *testing.T) {
 				ContentLength: 5,
 			},
 		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
+		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
 	}
@@ -160,6 +165,9 @@ func TestHandler_WriteString(t *testing.T) {
 				Status:        http.StatusOK,
 				ContentLength: 5,
 			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
 		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
@@ -221,6 +229,9 @@ func TestHandler_ReadFrom(t *testing.T) {
 				Status:        http.StatusOK,
 				ContentLength: 5,
 			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
 		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
@@ -291,6 +302,73 @@ func TestHandler_Hijack(t *testing.T) {
 			},
 			Response: &schema.HTTPResponse{
 				Status: http.StatusSwitchingProtocols,
+			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
+		},
+		Service: xray.ServiceData,
+		AWS:     xrayData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestHandler_Panic(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	client := xray.ContextClient(ctx)
+	h := HandlerWithClient(FixedTracingNamer("test"), client, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		panic(http.ErrAbortHandler)
+	}))
+	ts := httptest.NewServer(h)
+	defer ts.Close()
+
+	req, err := http.NewRequest(http.MethodGet, ts.URL+"/panic", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil {
+		resp.Body.Close()
+		t.Fatal("want error, got nil")
+	}
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		HTTP: &schema.HTTP{
+			Request: &schema.HTTPRequest{
+				Method:    http.MethodGet,
+				URL:       ts.URL + "/panic",
+				ClientIP:  "127.0.0.1",
+				UserAgent: "Go-http-client/1.1",
+			},
+		},
+		Subsegments: []*schema.Segment{
+			{
+				Name:  "response",
+				Fault: true,
+			},
+		},
+		Fault: true,
+		Cause: &schema.Cause{
+			WorkingDirectory: wd,
+			Exceptions: []schema.Exception{
+				{
+					Message: fmt.Sprintf("%T: %s", http.ErrAbortHandler, http.ErrAbortHandler.Error()),
+					Type:    "*xray.errorPanic",
+				},
 			},
 		},
 		Service: xray.ServiceData,

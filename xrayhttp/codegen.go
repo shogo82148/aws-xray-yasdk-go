@@ -46,7 +46,7 @@ func generate(interfaces []string, path string) {
 	import "net/http"
 	`)
 
-	g.Printf("func wrap(rw *responseTracer) http.ResponseWriter {\n")
+	g.Printf("func wrap(rw *serverResponseTracer) http.ResponseWriter {\n")
 	g.Printf("var n uint\n")
 	for i, iface := range interfaces {
 		g.Printf("if _, ok := rw.rw.(%s); ok {\n n|=0x%x }\n", iface, 1<<uint(i))
