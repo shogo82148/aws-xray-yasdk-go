@@ -1,6 +1,7 @@
 package ecs
 
 import (
+	"bufio"
 	"os"
 	"runtime"
 	"strings"
@@ -8,6 +9,8 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
+
+const cgroupPath = "/proc/self/cgroup"
 
 type plugin struct {
 	ECS *schema.ECS
@@ -28,7 +31,8 @@ func Init() {
 	}
 	xray.AddPlugin(&plugin{
 		ECS: &schema.ECS{
-			Container: hostname,
+			Container:   hostname,
+			ContainerID: containerID(cgroupPath),
 		},
 	})
 }
@@ -43,3 +47,24 @@ func (p *plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 
 // Origin implements Plugin.
 func (*plugin) Origin() string { return schema.OriginECSContainer }
+
+// Reads the docker-generated cgroup file that lists the full (untruncated) docker container ID at the end of each line.
+// This method takes advantage of that fact by just reading the 64-character ID from the end of the first line.
+func containerID(cgroup string) string {
+	const idLength = 64
+	f, err := os.Open(cgroup)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	if !scanner.Scan() {
+		return ""
+	}
+	line := scanner.Text()
+	if len(line) < idLength {
+		return ""
+	}
+	return line[len(line)-idLength:]
+}
