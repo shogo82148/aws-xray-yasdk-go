@@ -47,7 +47,7 @@ func beginSubsegmentForLambda(ctx context.Context, header, name string) (context
 
 	seg := &Segment{
 		ctx:           ctx,
-		name:          name, // TODO: @shogo82148 sanitize the name
+		name:          sanitizeSegmentName(name),
 		id:            NewSegmentID(),
 		startTime:     nowFunc(),
 		totalSegments: 1,
