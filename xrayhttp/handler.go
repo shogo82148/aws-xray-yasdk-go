@@ -270,5 +270,7 @@ func (rw *serverResponseTracer) close() {
 		rw.seg.Close()
 		rw.ctx, rw.seg = nil, nil
 	}
-	panic(err)
+	if err != nil {
+		panic(err)
+	}
 }
