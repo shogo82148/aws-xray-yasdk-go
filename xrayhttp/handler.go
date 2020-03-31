@@ -98,6 +98,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	seg.SetHTTPRequest(requestInfo)
 
 	rw := &serverResponseTracer{rw: w, ctx: ctx, seg: seg}
+	defer rw.close()
 	tracer.h.ServeHTTP(wrap(rw), r)
 	if rw.hijacked {
 		return
@@ -117,7 +118,6 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if rw.status >= 500 && rw.status < 600 {
 		seg.SetFault()
 	}
-	rw.close()
 }
 
 func getURL(r *http.Request) string {
@@ -257,9 +257,18 @@ func (rw *serverResponseTracer) ReadFrom(src io.Reader) (int64, error) {
 }
 
 func (rw *serverResponseTracer) close() {
+	err := recover()
 	if rw.respCtx != nil {
+		if err != nil {
+			rw.respSeg.SetFault()
+		}
 		rw.respSeg.Close()
 		rw.respCtx, rw.respSeg = nil, nil
 	}
-	rw.seg.Close()
+	if rw.ctx != nil {
+		rw.seg.AddPanic(err)
+		rw.seg.Close()
+		rw.ctx, rw.seg = nil, nil
+	}
+	panic(err)
 }

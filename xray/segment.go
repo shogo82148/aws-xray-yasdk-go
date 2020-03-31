@@ -315,9 +315,7 @@ func (seg *Segment) Close() {
 		xraylog.Debugf(seg.ctx, "Closing segment named %s", seg.name)
 	}
 	err := recover()
-	if err != nil {
-		seg.AddError(&errorPanic{err: err})
-	}
+	seg.AddPanic(err)
 	seg.close()
 	if seg.Sampled() {
 		seg.emit()
@@ -396,6 +394,23 @@ func (seg *Segment) AddError(err error) bool {
 // AddError sets the segment of the current context an error.
 func AddError(ctx context.Context, err error) bool {
 	return ContextSegment(ctx).AddError(err)
+}
+
+// AddPanic adds the information about panic.
+func (seg *Segment) AddPanic(err interface{}) bool {
+	if seg == nil {
+		return err != nil
+	}
+	if err == nil {
+		return false
+	}
+	seg.AddError(&errorPanic{err: err})
+	return true
+}
+
+// AddPanic is the shorthand of ContextSegment(ctx).AddPanic(err).
+func AddPanic(ctx context.Context, err interface{}) bool {
+	return ContextSegment(ctx).AddPanic(err)
 }
 
 // SetError sets error flag.
