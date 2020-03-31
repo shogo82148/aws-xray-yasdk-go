@@ -2,6 +2,7 @@ package xrayhttp
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"net"
 	"net/http"
@@ -96,7 +97,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	seg.SetHTTPRequest(requestInfo)
 
-	rw := &serverResponseTracer{rw: w, seg: seg}
+	rw := &serverResponseTracer{rw: w, ctx: ctx, seg: seg}
 	tracer.h.ServeHTTP(wrap(rw), r)
 	if rw.hijacked {
 		return
@@ -116,7 +117,7 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if rw.status >= 500 && rw.status < 600 {
 		seg.SetFault()
 	}
-	seg.Close()
+	rw.close()
 }
 
 func getURL(r *http.Request) string {
@@ -158,7 +159,10 @@ type responseWriter interface {
 }
 
 type serverResponseTracer struct {
+	ctx      context.Context
 	seg      *xray.Segment
+	respCtx  context.Context
+	respSeg  *xray.Segment
 	rw       http.ResponseWriter
 	status   int
 	size     int64
@@ -179,6 +183,9 @@ func (rw *serverResponseTracer) Write(b []byte) (int, error) {
 }
 
 func (rw *serverResponseTracer) WriteHeader(s int) {
+	if rw.respCtx == nil {
+		rw.respCtx, rw.respSeg = xray.BeginSubsegment(rw.ctx, "response")
+	}
 	rw.rw.WriteHeader(s)
 	rw.status = s
 }
@@ -193,6 +200,10 @@ func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 			rw.status = http.StatusSwitchingProtocols
 		}
 		rw.hijacked = true
+		if rw.respCtx != nil {
+			rw.respSeg.Close()
+			rw.respCtx, rw.respSeg = nil, nil
+		}
 		responseInfo := &schema.HTTPResponse{
 			Status:        rw.status,
 			ContentLength: rw.size,
@@ -243,4 +254,12 @@ func (rw *serverResponseTracer) ReadFrom(src io.Reader) (int64, error) {
 	}
 	rw.size += size
 	return size, err
+}
+
+func (rw *serverResponseTracer) close() {
+	if rw.respCtx != nil {
+		rw.respSeg.Close()
+		rw.respCtx, rw.respSeg = nil, nil
+	}
+	rw.seg.Close()
 }

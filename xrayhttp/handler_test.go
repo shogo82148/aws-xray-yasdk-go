@@ -104,6 +104,9 @@ func TestHandler(t *testing.T) {
 				ContentLength: 5,
 			},
 		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
+		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
 	}
@@ -160,6 +163,9 @@ func TestHandler_WriteString(t *testing.T) {
 				Status:        http.StatusOK,
 				ContentLength: 5,
 			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
 		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
@@ -221,6 +227,9 @@ func TestHandler_ReadFrom(t *testing.T) {
 				Status:        http.StatusOK,
 				ContentLength: 5,
 			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
 		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
@@ -292,6 +301,9 @@ func TestHandler_Hijack(t *testing.T) {
 			Response: &schema.HTTPResponse{
 				Status: http.StatusSwitchingProtocols,
 			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
 		},
 		Service: xray.ServiceData,
 		AWS:     xrayData,
