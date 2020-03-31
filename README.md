@@ -18,6 +18,7 @@ The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
 - `AWS_XRAY_CONTEXT_MISSING`: `LOG_ERROR` or `RUNTIME_ERROR`. The default value is `LOG_ERROR`.
 - `AWS_XRAY_TRACING_NAME`: Set a service name that the SDK uses for segments.
 - `AWS_XRAY_DEBUG_MODE`: Set to `TRUE` to configure the SDK to output logs to the console
+- `AWS_XRAY_LOG_LEVEL`: Set a log level for the SDK built in logger. it should be `debug`, `info`, `warn`, `error` or `silent`. This value is ignored if `AWS_XRAY_DEBUG_MODE` is set.
 
 ## Quick Start
 
