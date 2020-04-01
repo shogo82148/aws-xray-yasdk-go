@@ -220,9 +220,9 @@ type EC2 struct {
 
 // XRay is information about X-Ray SDK.
 type XRay struct {
-	SDKVersion string `json:"sdk_version,omitempty"`
-	SDK        string `json:"sdk,omitempty"`
-	RuleName   string `json:"sampling_rule_name,omitempty"`
+	SDKVersion       string `json:"sdk_version,omitempty"`
+	SDK              string `json:"sdk,omitempty"`
+	SamplingRuleName string `json:"sampling_rule_name,omitempty"`
 }
 
 // ElasticBeanstalk is information about an Elastic Beanstalk environment.
