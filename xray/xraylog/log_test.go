@@ -3,6 +3,7 @@ package xraylog
 import (
 	"bytes"
 	"context"
+	"io/ioutil"
 	"strings"
 	"testing"
 )
@@ -23,5 +24,21 @@ func TestLogger(t *testing.T) {
 	}
 	if !strings.HasSuffix(lines[1], " [ERROR] error") {
 		t.Errorf("expected first line to be error, got %q", lines[1])
+	}
+}
+
+func BenchmarkLogError(b *testing.B) {
+	logger := NewDefaultLogger(ioutil.Discard, LogLevelWarn)
+	ctx := WithLogger(context.Background(), logger)
+	for i := 0; i < b.N; i++ {
+		Errorf(ctx, "something wrong: %v", "foobar")
+	}
+}
+
+func BenchmarkLogDebug(b *testing.B) {
+	logger := NewDefaultLogger(ioutil.Discard, LogLevelWarn)
+	ctx := WithLogger(context.Background(), logger)
+	for i := 0; i < b.N; i++ {
+		Debugf(ctx, "something wrong: %v", "foobar")
 	}
 }

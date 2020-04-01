@@ -1,3 +1,10 @@
+// Package xraylog implements a logger with a log level, and an interface for a custom logger.
+// By default, the SDK logs error messages to the os.Stderr.
+// The log level of the built in logger can be set by using either
+// the AWS_XRAY_DEBUG_MODE or AWS_XRAY_LOG_LEVEL environment variables.
+// If AWS_XRAY_DEBUG_MODE is set, the log level is set to the debug level.
+// AWS_XRAY_LOG_LEVEL may be set to debug, info, warn, error or silent.
+// This value is ignored if AWS_XRAY_DEBUG_MODE is set.
 package xraylog
 
 import (
@@ -47,9 +54,11 @@ func init() {
 	globalLogger = NewDefaultLogger(os.Stderr, level)
 }
 
-// Logger is the logging interface used by xray.
+// Logger is the logging interface used by X-Ray YA-SDK.
 type Logger interface {
-	Log(level LogLevel, msg string)
+	// Log outputs the msg into the log. msg is fmt.Stringer because of lazy evaluation.
+	// It may be called concurrently from multiple goroutines.
+	Log(ctx context.Context, level LogLevel, msg fmt.Stringer)
 }
 
 // LogLevel represents the severity of a log message, where a higher value
@@ -133,10 +142,13 @@ func NewDefaultLogger(w io.Writer, minLevel LogLevel) Logger {
 	}
 }
 
-func (l *defaultLogger) Log(level LogLevel, msg string) {
+func (l *defaultLogger) Log(ctx context.Context, level LogLevel, msg fmt.Stringer) {
 	if level < l.minLevel {
 		return
 	}
+
+	// evaluate the message text lazily
+	str := msg.String()
 
 	buf := l.pool.Get().(*bytes.Buffer)
 	defer l.pool.Put(buf)
@@ -145,7 +157,7 @@ func (l *defaultLogger) Log(level LogLevel, msg string) {
 	buf.WriteString(" [")
 	buf.WriteString(level.String())
 	buf.WriteString("] ")
-	buf.WriteString(msg)
+	buf.WriteString(str)
 	buf.WriteString("\n")
 
 	l.mu.Lock()
@@ -157,46 +169,63 @@ func (l *defaultLogger) Log(level LogLevel, msg string) {
 type NullLogger struct{}
 
 // Log implements Logger.
-func (NullLogger) Log(level LogLevel, msg string) {
+func (NullLogger) Log(_ context.Context, _ LogLevel, _ fmt.Stringer) {
 	// do nothing
 }
 
 // Info outputs info level log message.
 func Info(ctx context.Context, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelInfo, fmt.Sprint(v...))
+	ContextLogger(ctx).Log(ctx, LogLevelInfo, printArgs{args: v})
 }
 
 // Infof outputs info level log message.
 func Infof(ctx context.Context, format string, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelInfo, fmt.Sprintf(format, v...))
+	ContextLogger(ctx).Log(ctx, LogLevelInfo, printfArgs{format: format, args: v})
 }
 
 // Debug outputs debug level log message.
 func Debug(ctx context.Context, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelDebug, fmt.Sprint(v...))
+	ContextLogger(ctx).Log(ctx, LogLevelDebug, printArgs{args: v})
 }
 
 // Debugf outputs debug level log message.
 func Debugf(ctx context.Context, format string, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelDebug, fmt.Sprintf(format, v...))
+	ContextLogger(ctx).Log(ctx, LogLevelDebug, printfArgs{format: format, args: v})
 }
 
 // Warn outputs warn level log message.
 func Warn(ctx context.Context, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelWarn, fmt.Sprint(v...))
+	ContextLogger(ctx).Log(ctx, LogLevelWarn, printArgs{args: v})
 }
 
 // Warnf outputs warn level log message.
 func Warnf(ctx context.Context, format string, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelWarn, fmt.Sprintf(format, v...))
+	ContextLogger(ctx).Log(ctx, LogLevelWarn, printfArgs{format: format, args: v})
 }
 
 // Error outputs error level log message.
 func Error(ctx context.Context, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelError, fmt.Sprint(v...))
+	ContextLogger(ctx).Log(ctx, LogLevelError, printArgs{args: v})
 }
 
 // Errorf outputs warn level log message.
 func Errorf(ctx context.Context, format string, v ...interface{}) {
-	ContextLogger(ctx).Log(LogLevelError, fmt.Sprintf(format, v...))
+	ContextLogger(ctx).Log(ctx, LogLevelError, printfArgs{format: format, args: v})
+}
+
+type printArgs struct {
+	args []interface{}
+}
+
+func (args printArgs) String() string {
+	return fmt.Sprint(args.args...)
+}
+
+type printfArgs struct {
+	format string
+	args   []interface{}
+}
+
+func (args printfArgs) String() string {
+	return fmt.Sprintf(args.format, args.args...)
 }
