@@ -1,3 +1,10 @@
+// Package xraylog implements a logger with a log level, and an interface for a custom logger.
+// By default, the SDK logs error messages to the os.Stderr.
+// The log level of the built in logger can be set by using either
+// the AWS_XRAY_DEBUG_MODE or AWS_XRAY_LOG_LEVEL environment variables.
+// If AWS_XRAY_DEBUG_MODE is set, the log level is set to the debug level.
+// AWS_XRAY_LOG_LEVEL may be set to debug, info, warn, error or silent.
+// This value is ignored if AWS_XRAY_DEBUG_MODE is set.
 package xraylog
 
 import (
