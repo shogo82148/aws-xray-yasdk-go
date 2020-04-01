@@ -15,13 +15,6 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
-var xrayData = schema.AWS{
-	"xray": map[string]interface{}{
-		"sdk_version": xray.Version,
-		"sdk":         xray.Type,
-	},
-}
-
 // compile time checking to satisfy the interface
 // https://golang.org/doc/effective_go.html#blank_implements
 var _ http.ResponseWriter = (*serverResponseTracer)(nil)
@@ -110,7 +103,6 @@ func TestHandler(t *testing.T) {
 			{Name: "response"},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -170,7 +162,6 @@ func TestHandler_WriteString(t *testing.T) {
 			{Name: "response"},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -234,7 +225,6 @@ func TestHandler_ReadFrom(t *testing.T) {
 			{Name: "response"},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -308,7 +298,6 @@ func TestHandler_Hijack(t *testing.T) {
 			{Name: "response"},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -372,7 +361,6 @@ func TestHandler_Panic(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

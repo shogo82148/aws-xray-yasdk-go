@@ -9,8 +9,8 @@ import (
 // Version records the current X-Ray Go SDK version.
 const Version = "0.0.1"
 
-// Type records which X-Ray SDK customer uses.
-const Type = "X-Ray YA-SDK for Go"
+// Name records which X-Ray SDK customer uses.
+const Name = "X-Ray YA-SDK for Go"
 
 // ServiceData is the metadata of the user service.
 // It is used by all segments that X-Ray YA-SDK sends.

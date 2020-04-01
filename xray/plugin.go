@@ -50,9 +50,9 @@ func (xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 		doc.AWS = schema.AWS{}
 	}
 	doc.AWS.SetXRay(&schema.XRay{
-		Version:  Version,
-		Type:     Type,
-		RuleName: seg.ruleName,
+		SDKVersion:       Version,
+		SDK:              Name,
+		SamplingRuleName: seg.ruleName,
 	})
 }
 

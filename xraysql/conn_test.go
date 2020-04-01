@@ -84,7 +84,6 @@ func TestConn_Exec(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -158,7 +157,6 @@ func TestConn_ExecContext(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -241,7 +239,6 @@ func TestConn_Query(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -324,7 +321,6 @@ func TestConn_QueryContext(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

@@ -16,7 +16,7 @@ import (
 var xrayData = schema.AWS{
 	"xray": map[string]interface{}{
 		"sdk_version": Version,
-		"sdk":         Type,
+		"sdk":         Name,
 	},
 }
 

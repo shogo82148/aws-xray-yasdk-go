@@ -28,6 +28,12 @@ func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out.StartTime = 0
 	out.EndTime = 0
 	out.Subsegments = nil
+	if out.AWS != nil {
+		delete(out.AWS, "xray")
+		if len(out.AWS) == 0 {
+			out.AWS = nil
+		}
+	}
 	if out.Cause != nil {
 		for i := range out.Cause.Exceptions {
 			out.Cause.Exceptions[i].ID = ""
@@ -132,12 +138,6 @@ func TestClient(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: schema.AWS{
-			"xray": map[string]interface{}{
-				"sdk_version": xray.Version,
-				"sdk":         xray.Type,
-			},
-		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -247,12 +247,6 @@ func TestClient_FailDial(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: schema.AWS{
-			"xray": map[string]interface{}{
-				"sdk_version": xray.Version,
-				"sdk":         xray.Type,
-			},
-		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -375,12 +369,6 @@ func TestClient_BadRequest(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS: schema.AWS{
-			"xray": map[string]interface{}{
-				"sdk_version": xray.Version,
-				"sdk":         xray.Type,
-			},
-		},
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
