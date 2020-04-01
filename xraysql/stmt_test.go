@@ -84,7 +84,6 @@ func TestStmt_Exec(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -167,7 +166,6 @@ func TestStmt_Query(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

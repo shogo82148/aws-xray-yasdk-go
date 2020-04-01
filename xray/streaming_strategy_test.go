@@ -73,8 +73,8 @@ func TestStreamingStrategyBatchAll(t *testing.T) {
 			Service:   ServiceData,
 			AWS: schema.AWS{
 				"xray": &schema.XRay{
-					Version: Version,
-					Type:    Type,
+					SDKVersion: Version,
+					SDK:        Name,
 				},
 			},
 			Subsegments: []*schema.Segment{
@@ -185,8 +185,8 @@ func TestStreamingStrategyLimitSubsegment(t *testing.T) {
 				Service:    ServiceData,
 				AWS: schema.AWS{
 					"xray": &schema.XRay{
-						Version: Version,
-						Type:    Type,
+						SDKVersion: Version,
+						SDK:        Name,
 					},
 				},
 				Subsegments: []*schema.Segment{

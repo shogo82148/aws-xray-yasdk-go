@@ -124,7 +124,6 @@ func TestTx_Commit(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -244,7 +243,6 @@ func TestTx_Rollback(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)

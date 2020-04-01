@@ -26,6 +26,12 @@ func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out.StartTime = 0
 	out.EndTime = 0
 	out.Subsegments = nil
+	if out.AWS != nil {
+		delete(out.AWS, "xray")
+		if len(out.AWS) == 0 {
+			out.AWS = nil
+		}
+	}
 	if out.Cause != nil {
 		for i := range out.Cause.Exceptions {
 			out.Cause.Exceptions[i].ID = ""
@@ -126,7 +132,6 @@ func TestClient(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -229,7 +234,6 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -331,7 +335,6 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -450,7 +453,6 @@ func TestClient_TLS(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -568,7 +570,6 @@ func TestClient_DNS(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		dns["addresses"] = []interface{}{"::1", addr} // addresses may contains IPv6
@@ -673,7 +674,6 @@ func TestClient_InvalidDomain(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -777,7 +777,6 @@ func TestClient_InvalidAddress(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -892,7 +891,6 @@ func TestClient_InvalidCertificate(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
@@ -1009,7 +1007,6 @@ func TestClient_FailToReadResponse(t *testing.T) {
 			},
 		},
 		Service: xray.ServiceData,
-		AWS:     xrayData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
