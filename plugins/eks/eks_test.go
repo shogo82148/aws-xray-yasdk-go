@@ -1,6 +1,7 @@
 package eks
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ func TestContainerID(t *testing.T) {
 	if err := ioutil.WriteFile(dummyCGroup, []byte("14:name=systemd:/docker/"+want+"\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	got := containerID(dummyCGroup)
+	got := containerID(context.Background(), dummyCGroup)
 	if got != want {
 		t.Errorf("want %s, got %s", want, got)
 	}
