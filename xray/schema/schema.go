@@ -2,7 +2,9 @@
 // ref. https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
 package schema
 
-import "strings"
+import (
+	"strings"
+)
 
 // The value of Segment.Origin.
 const (
@@ -167,27 +169,14 @@ func (aws AWS) SetAccountID(accountID string) {
 	aws["account_id"] = accountID
 }
 
-// ECS returns the information about an Amazon ECS container.
-func (aws AWS) ECS() *ECS {
-	if aws == nil {
-		return nil
-	}
-	v, _ := aws["ecs"].(*ECS)
-	return v
-}
-
 // SetECS sets ECS.
 func (aws AWS) SetECS(ecs *ECS) {
 	aws["ecs"] = ecs
 }
 
-// EC2 returns the information about an Amazon EC2 instance.
-func (aws AWS) EC2() *EC2 {
-	if aws == nil {
-		return nil
-	}
-	v, _ := aws["ec2"].(*EC2)
-	return v
+// SetEKS sets EKS.
+func (aws AWS) SetEKS(eks *EKS) {
+	aws["eks"] = eks
 }
 
 // SetEC2 sets EC2.
@@ -195,27 +184,9 @@ func (aws AWS) SetEC2(ec2 *EC2) {
 	aws["ec2"] = ec2
 }
 
-// ElasticBeanstalk returns the information about an Elastic Beanstalk environment.
-func (aws AWS) ElasticBeanstalk() *ElasticBeanstalk {
-	if aws == nil {
-		return nil
-	}
-	v, _ := aws["elastic_beanstalk"].(*ElasticBeanstalk)
-	return v
-}
-
 // SetElasticBeanstalk sets ElasticBeanstalk.
 func (aws AWS) SetElasticBeanstalk(bean *ElasticBeanstalk) {
 	aws["elastic_beanstalk"] = bean
-}
-
-// XRay returns the information about the X-Ray SDK.
-func (aws AWS) XRay() *XRay {
-	if aws == nil {
-		return nil
-	}
-	v, _ := aws["xray"].(*XRay)
-	return v
 }
 
 // SetXRay sets XRay.
@@ -227,6 +198,15 @@ func (aws AWS) SetXRay(xray *XRay) {
 type ECS struct {
 	// The container ID of the container running your application.
 	Container string `json:"container,omitempty"`
+
+	ContainerID string `json:"containerId,omitempty"`
+}
+
+// EKS is information about an Amazon EKS container.
+type EKS struct {
+	ClusterName string `json:"cluster_name,omitempty"`
+	Pod         string `json:"pod,omitempty"`
+	ContainerID string `json:"containerId,omitempty"`
 }
 
 // EC2 is information about an EC2 instance.
