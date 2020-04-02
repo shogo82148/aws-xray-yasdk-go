@@ -172,13 +172,27 @@ func WithSegment(ctx context.Context, seg *Segment) context.Context {
 //
 // Caller should close the segment when the work is done.
 func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) {
-	return BeginSegmentWithRequest(ctx, name, nil)
+	return beginSegment(ctx, name, TraceHeader{}, nil)
 }
 
 // BeginSegmentWithRequest creates a new Segment for a given name and context.
+// The trace id is set by the x-amzn-trace-id header of the request.
 //
 // Caller should close the segment when the work is done.
 func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) (context.Context, *Segment) {
+	return beginSegment(ctx, name, TraceHeader{}, r)
+}
+
+// BeginSegmentWithHeader creates a new Segment for a given name, context, and trace header.
+// It is used for recovering the trace context. e.g. the receiver component of Amazon SQS.
+// https://docs.aws.amazon.com/xray/latest/devguide/xray-services-sqs.html#xray-services-sqs-retrieving
+//
+// Caller should close the segment when the work is done.
+func BeginSegmentWithHeader(ctx context.Context, name, header string) (context.Context, *Segment) {
+	return beginSegment(ctx, name, ParseTraceHeader(header), nil)
+}
+
+func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Request) (context.Context, *Segment) {
 	seg := &Segment{
 		ctx:           ctx,
 		name:          sanitizeSegmentName(name),
@@ -189,7 +203,6 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 	}
 	seg.root = seg
 
-	var h TraceHeader
 	if r != nil {
 		// Sampling strategy for http calls
 		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
