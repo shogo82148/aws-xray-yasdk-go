@@ -168,6 +168,11 @@ func WithSegment(ctx context.Context, seg *Segment) context.Context {
 	return context.WithValue(ctx, segmentContextKey, seg)
 }
 
+// BeginDummySegment creates a new segment that traces nothing.
+func BeginDummySegment(ctx context.Context) (context.Context, *Segment) {
+	return WithSegment(ctx, nil), nil
+}
+
 // BeginSegment creates a new Segment for a given name and context.
 //
 // Caller should close the segment when the work is done.
@@ -242,14 +247,13 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 	if seg.sampled {
 		h.SamplingDecision = SamplingDecisionSampled
 	} else {
-		h.SamplingDecision = SamplingDecisionNotSampled
+		return BeginDummySegment(ctx)
 	}
 
 	seg.traceID = h.TraceID
 	seg.traceHeader = h
 
-	ctx = context.WithValue(ctx, segmentContextKey, seg)
-	return ctx, seg
+	return WithSegment(ctx, seg), seg
 }
 
 // BeginSubsegment creates a new Segment for a given name and context.
@@ -303,6 +307,9 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 
 // Sampled returns whether the current segment is sampled.
 func (seg *Segment) Sampled() bool {
+	if seg == nil {
+		return false
+	}
 	root := seg.root
 	root.mu.Lock()
 	defer root.mu.Unlock()
