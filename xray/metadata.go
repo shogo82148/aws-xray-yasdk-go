@@ -7,7 +7,7 @@ import (
 )
 
 // Version records the current X-Ray Go SDK version.
-const Version = "0.0.3"
+const Version = "0.0.4"
 
 // Name records which X-Ray SDK customer uses.
 const Name = "X-Ray YA-SDK for Go"
