@@ -40,10 +40,10 @@ xraylog.SetLogger(NewDefaultLogger(os.Stderr, xraylog.LogLevelDebug))
 
 ```go
 func DoSomethingWithSegment(ctx context.Context) error
-  ctx, seg := BeginSegment(ctx, "service-name")
+  ctx, seg := xray.BeginSegment(ctx, "service-name")
   defer seg.Close()
 
-  ctx, sub := BeginSubsegment(ctx, "subsegment-name")
+  ctx, sub := xray.BeginSubsegment(ctx, "subsegment-name")
   defer sub.Close()
 
   err := doSomething(ctx)
