@@ -2,6 +2,7 @@ package xray
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -12,10 +13,14 @@ import (
 // Config is a configure for connecting AWS X-Ray daemon
 type Config struct {
 	// DaemonAddress is the address for connecting AWS X-Ray daemon.
-	// Its overwrites the address from AWS_XRAY_DAEMON_ADDRESS environment value.
+	// It overwrites the address from the AWS_XRAY_DAEMON_ADDRESS environment value.
 	// By default, the SDK uses 127.0.0.1:2000 for both trace data (UDP) and sampling (TCP).
 	// The format is "address:port" or "tcp:address:port udp:address:port".
 	DaemonAddress string
+
+	// Disabled disables X-Ray tracing.
+	// It overwrites the setting from the AWS_XRAY_SDK_ENABLED environment value.
+	Disabled bool
 
 	StreamingStrategy      StreamingStrategy
 	SamplingStrategy       sampling.Strategy
@@ -65,4 +70,16 @@ func (c *Config) daemonEndpoints() daemonEndpoints {
 		}
 	}
 	return p
+}
+
+func (c *Config) disabled() bool {
+	flag := os.Getenv("AWS_XRAY_SDK_ENABLED")
+	if flag == "" {
+		return c.Disabled
+	}
+	ret, err := strconv.ParseBool(flag)
+	if err != nil {
+		return c.Disabled
+	}
+	return !ret
 }
