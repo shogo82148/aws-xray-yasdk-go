@@ -73,13 +73,16 @@ func (c *Config) daemonEndpoints() daemonEndpoints {
 }
 
 func (c *Config) disabled() bool {
+	if c != nil && c.Disabled {
+		return true
+	}
 	flag := os.Getenv("AWS_XRAY_SDK_ENABLED")
 	if flag == "" {
-		return c.Disabled
+		return false
 	}
 	ret, err := strconv.ParseBool(flag)
 	if err != nil {
-		return c.Disabled
+		return false
 	}
 	return !ret
 }
