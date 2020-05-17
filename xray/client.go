@@ -51,6 +51,7 @@ type Client struct {
 
 	pool sync.Pool
 
+	disabled               bool
 	streamingStrategy      StreamingStrategy
 	samplingStrategy       sampling.Strategy
 	contextMissingStrategy ctxmissing.Strategy
@@ -100,6 +101,7 @@ func New(config *Config) *Client {
 				return new(bytes.Buffer)
 			},
 		},
+		disabled:               config.disabled(),
 		streamingStrategy:      streamingStrategy,
 		samplingStrategy:       samplingStrategy,
 		contextMissingStrategy: contextMissingStrategy,
@@ -115,6 +117,10 @@ func (c *Client) Emit(ctx context.Context, seg *Segment) {
 }
 
 func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
+	if c.disabled {
+		return
+	}
+
 	buf := c.pool.Get().(*bytes.Buffer)
 	defer c.pool.Put(buf)
 	buf.Reset()

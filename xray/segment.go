@@ -198,6 +198,11 @@ func BeginSegmentWithHeader(ctx context.Context, name, header string) (context.C
 }
 
 func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Request) (context.Context, *Segment) {
+	client := ContextClient(ctx)
+	if client != nil && client.disabled {
+		return BeginDummySegment(ctx)
+	}
+
 	seg := &Segment{
 		ctx:           ctx,
 		name:          sanitizeSegmentName(name),
@@ -218,7 +223,6 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 		case SamplingDecisionNotSampled:
 			xraylog.Debug(ctx, "Incoming header decided: Sampled=false")
 		default:
-			client := seg.client()
 			sd := client.samplingStrategy.ShouldTrace(&sampling.Request{
 				Host:        r.Host,
 				URL:         r.URL.Path,
@@ -233,7 +237,6 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 			xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 		}
 	} else {
-		client := seg.client()
 		sd := client.samplingStrategy.ShouldTrace(nil)
 		seg.sampled = sd.Sample
 		if sd.Rule != nil {
