@@ -14,12 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
@@ -125,8 +119,8 @@ type samplingStatisticsDocument struct {
 	// The number of requests recorded.
 	SampledCount int64 `json:"SampledCount"`
 
-	// The current time.
-	Timestamp int64 `json:"Timestamp"`
+	// The current time, in ISO-8601 format (YYYY-MM-DDThh:mm:ss).
+	Timestamp string `json:"Timestamp"`
 }
 
 // https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html#API_GetSamplingTargets_ResponseSyntax
@@ -134,7 +128,7 @@ type getSamplingTargetsOutput struct {
 	// The last time a user changed the sampling rule configuration. If the sampling
 	// rule configuration changed since the service last retrieved it, the service
 	// should call GetSamplingRules to get the latest version.
-	LastRuleModification int64 `json:"LastRuleModification"`
+	LastRuleModification string `json:"LastRuleModification"`
 
 	// Updated rules that the service should use to sample requests.
 	SamplingTargetDocuments []*samplingTargetDocument `json:"SamplingTargetDocuments"`
@@ -155,8 +149,8 @@ type samplingTargetDocument struct {
 	// The number of requests per second that X-Ray allocated this service.
 	ReservoirQuota int64 `json:"ReservoirQuota"`
 
-	// When the reservoir quota expires.
-	ReservoirQuotaTTL int64 `json:"ReservoirQuotaTTL"`
+	// When the reservoir quota expires, in ISO-8601 format (YYYY-MM-DDThh:mm:ss).
+	ReservoirQuotaTTL string `json:"ReservoirQuotaTTL"`
 
 	// The name of the sampling rule.
 	RuleName string `json:"RuleName"`
@@ -173,18 +167,10 @@ type unprocessedStatistics struct {
 	RuleName string `json:"RuleName"`
 }
 
-type xrayAPI interface {
-	GetSamplingRulesPagesWithContext(aws.Context, *xraySvc.GetSamplingRulesInput, func(*xraySvc.GetSamplingRulesOutput, bool) bool, ...request.Option) error
-	GetSamplingTargetsWithContext(aws.Context, *xraySvc.GetSamplingTargetsInput, ...request.Option) (*xraySvc.GetSamplingTargetsOutput, error)
-}
-
 // CentralizedStrategy is an implementation of SamplingStrategy.
 type CentralizedStrategy struct {
 	// Sampling strategy used if centralized manifest is expired
 	fallback *LocalizedStrategy
-
-	// AWS X-Ray client
-	xray xrayAPI
 
 	// Address for X-Ray daemon
 	addr string
@@ -210,11 +196,6 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 		return nil, err
 	}
 
-	x, err := newXRaySvc(addr)
-	if err != nil {
-		return nil, err
-	}
-
 	// Generate clientID
 	var r [12]byte
 	if _, err := crand.Read(r[:]); err != nil {
@@ -225,7 +206,6 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 
 	return &CentralizedStrategy{
 		fallback:     local,
-		xray:         x,
 		addr:         addr,
 		clientID:     fmt.Sprintf("%x", r),
 		pollerCtx:    pollerCtx,
@@ -235,37 +215,6 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 			Quotas: make(map[string]*centralizedQuota),
 		},
 	}, nil
-}
-
-// newXRaySvc returns a new AWS X-Ray client that connects to addr.
-// The requests are unsigned and it is expected that the XRay daemon signs and forwards the requests.
-func newXRaySvc(addr string) (*xraySvc.XRay, error) {
-	url := "http://" + addr
-	// Endpoint resolver for proxying requests through the daemon
-	f := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-		return endpoints.ResolvedEndpoint{
-			URL: url,
-		}, nil
-	}
-
-	// Dummy session for unsigned requests
-	sess, err := session.NewSession(&aws.Config{
-		Region:           aws.String("us-west-1"),
-		Credentials:      credentials.NewStaticCredentials("", "", ""),
-		EndpointResolver: endpoints.ResolverFunc(f),
-	})
-	if err != nil {
-		return nil, err
-	}
-	x := xraySvc.New(sess)
-
-	// Remove Signer and replace with No-Op handler
-	x.Handlers.Sign.Clear()
-	x.Handlers.Sign.PushBack(func(*request.Request) {
-		// do nothing
-	})
-
-	return x, nil
 }
 
 func (s *CentralizedStrategy) getSamplingRulesPages(ctx context.Context, input *getSamplingRulesInput, callback func(*getSamplingRulesOutput, bool) bool) error {
@@ -451,35 +400,35 @@ func (s *CentralizedStrategy) refreshRule() {
 	manifest := s.getManifest()
 	rules := make([]*centralizedRule, 0, len(manifest.Rules))
 	quotas := make(map[string]*centralizedQuota, len(manifest.Rules))
-	err := s.xray.GetSamplingRulesPagesWithContext(ctx, &xraySvc.GetSamplingRulesInput{}, func(out *xraySvc.GetSamplingRulesOutput, lastPage bool) bool {
+	err := s.getSamplingRulesPages(ctx, &getSamplingRulesInput{}, func(out *getSamplingRulesOutput, lastPage bool) bool {
 		for _, record := range out.SamplingRuleRecords {
 			r := record.SamplingRule
-			name := aws.StringValue(r.RuleName)
+			name := r.RuleName
 			quota, ok := manifest.Quotas[name]
 			if !ok {
 				// we don't have enough sampling statistics,
 				// so borrow the reservoir quota.
 				quota = &centralizedQuota{
-					fixedRate: aws.Float64Value(r.FixedRate),
+					fixedRate: r.FixedRate,
 				}
 			}
 			rule := &centralizedRule{
 				quota:       quota,
 				ruleName:    name,
-				priority:    aws.Int64Value(r.Priority),
-				host:        aws.StringValue(r.Host),
-				urlPath:     aws.StringValue(r.URLPath),
-				httpMethod:  aws.StringValue(r.HTTPMethod),
-				serviceName: aws.StringValue(r.ServiceName),
-				serviceType: aws.StringValue(r.ServiceType),
+				priority:    r.Priority,
+				host:        r.Host,
+				urlPath:     r.URLPath,
+				httpMethod:  r.HTTPMethod,
+				serviceName: r.ServiceName,
+				serviceType: r.ServiceType,
 			}
 			rules = append(rules, rule)
 			quotas[name] = quota
 			xraylog.Debugf(
 				ctx,
 				"Refresh Sampling Rule: Name: %s, Priority: %d, FixedRate: %f, Host: %s, Method: %s, ServiceName: %s, ServiceType: %s",
-				name, aws.Int64Value(r.Priority), aws.Float64Value(r.FixedRate),
-				aws.StringValue(r.Host), aws.StringValue(r.HTTPMethod), aws.StringValue(r.ServiceName), aws.StringValue(r.ServiceType),
+				name, r.Priority, r.FixedRate,
+				r.Host, r.HTTPMethod, r.ServiceName, r.ServiceType,
 			)
 		}
 		return true
@@ -515,16 +464,16 @@ func (s *CentralizedStrategy) refreshQuota() {
 
 	manifest := s.getManifest()
 	now := time.Now()
-	stats := make([]*xraySvc.SamplingStatisticsDocument, 0, len(manifest.Rules))
+	stats := make([]*samplingStatisticsDocument, 0, len(manifest.Rules))
 	for _, r := range manifest.Rules {
 		stat := r.quota.Stats()
-		stats = append(stats, &xraySvc.SamplingStatisticsDocument{
-			ClientID:     &s.clientID,
-			RuleName:     &r.ruleName,
-			RequestCount: &stat.requests,
-			SampledCount: &stat.sampled,
-			BorrowCount:  &stat.borrowed,
-			Timestamp:    &now,
+		stats = append(stats, &samplingStatisticsDocument{
+			ClientID:     s.clientID,
+			RuleName:     r.ruleName,
+			RequestCount: stat.requests,
+			SampledCount: stat.sampled,
+			BorrowCount:  stat.borrowed,
+			Timestamp:    now.Format(time.RFC3339),
 		})
 		xraylog.Debugf(
 			ctx,
@@ -538,7 +487,7 @@ func (s *CentralizedStrategy) refreshQuota() {
 		if l > maxTargets {
 			l = maxTargets
 		}
-		resp, err := s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
+		resp, err := s.getSamplingTargets(ctx, &getSamplingTargetsInput{
 			SamplingStatisticsDocuments: stats[:l],
 		})
 		stats = stats[l:]
@@ -547,12 +496,19 @@ func (s *CentralizedStrategy) refreshQuota() {
 			continue
 		}
 		for _, doc := range resp.SamplingTargetDocuments {
-			if quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]; ok {
-				quota.Update(doc)
+			if quota, ok := manifest.Quotas[doc.RuleName]; ok {
+				if err := quota.update(doc); err != nil {
+					xraylog.Errorf(
+						ctx,
+						"Failed to Refresh Quota: Name: %s, Quota: %d, TTL: %s, Interval: %d, Error: %v",
+						doc.RuleName, doc.ReservoirQuota, doc.ReservoirQuotaTTL, doc.Interval, err,
+					)
+					continue
+				}
 				xraylog.Debugf(
 					ctx,
 					"Refresh Quota: Name: %s, Quota: %d, TTL: %s, Interval: %d",
-					aws.StringValue(doc.RuleName), aws.Int64Value(doc.ReservoirQuota), doc.ReservoirQuotaTTL, aws.Int64Value(doc.Interval),
+					doc.RuleName, doc.ReservoirQuota, doc.ReservoirQuotaTTL, doc.Interval,
 				)
 			} else {
 				// new rule may be added? try to refresh.
@@ -560,7 +516,12 @@ func (s *CentralizedStrategy) refreshQuota() {
 			}
 		}
 		// check the rules are updated.
-		needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
+		lastModification, err := time.Parse(time.RFC3339Nano, resp.LastRuleModification)
+		if err != nil {
+			needRefresh = true
+		} else {
+			needRefresh = needRefresh || lastModification.After(manifest.RefreshedAt)
+		}
 	}
 
 	xraylog.Debug(ctx, "sampling targets are refreshed.")
