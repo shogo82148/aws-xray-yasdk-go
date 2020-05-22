@@ -22,6 +22,138 @@ import (
 const defaultInterval = int64(10)
 const manifestTTL = 3600 // Seconds
 
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html#API_GetSamplingRules_RequestBody
+type getSamplingRulesInput struct {
+	NextToken string `json:"NextToken,omitempty"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html#API_GetSamplingRules_ResponseSyntax
+type getSamplingRulesOutput struct {
+	NextToken           string `json:"NextToken,omitempty"`
+	SamplingRuleRecords []*samplingRuleRecord
+}
+
+type samplingRuleRecord struct {
+	CreatedAt    int64        `json:"CreatedAt"`
+	ModifiedAt   int64        `json:"ModifiedAt"`
+	SamplingRule samplingRule `json:"SamplingRule"`
+}
+
+type samplingRule struct {
+	// Matches attributes derived from the request.
+	Attributes map[string]string `json:"Attributes"`
+
+	// The percentage of matching requests to instrument, after the reservoir is
+	// exhausted.
+	FixedRate float64 `json:"FixedRate"`
+
+	// Matches the HTTP method of a request.
+	HTTPMethod string `json:"HTTPMethod"`
+
+	// Matches the hostname from a request URL.
+	Host string `json:"Host"`
+
+	// The priority of the sampling rule.
+	Priority int64 `json:"Priority"`
+
+	// A fixed number of matching requests to instrument per second, prior to applying
+	// the fixed rate. The reservoir is not used directly by services, but applies
+	// to all services using the rule collectively.
+	ReservoirSize int64 `json:"ReservoirSize"`
+
+	// Matches the ARN of the AWS resource on which the service runs.
+	ResourceARN string `json:"ResourceARN"`
+
+	// The ARN of the sampling rule. Specify a rule by either name or ARN, but not
+	// both.
+	RuleARN string `json:"RuleARN"`
+
+	// The name of the sampling rule. Specify a rule by either name or ARN, but
+	// not both.
+	RuleName string `json:"RuleName"`
+
+	// Matches the name that the service uses to identify itself in segments.
+	ServiceName string `json:"ServiceName"`
+
+	// Matches the origin that the service uses to identify its type in segments.
+	ServiceType string `json:"ServiceType"`
+
+	// Matches the path from a request URL.
+	URLPath string `json:"URLPath"`
+
+	// The version of the sampling rule format (1).
+	Version int64 `json:"Version"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html#API_GetSamplingTargets_RequestBody
+type getSamplingTargetsInput struct {
+	SamplingStatisticsDocuments []*samplingStatisticsDocument `json:"SamplingStatisticsDocuments"`
+}
+
+type samplingStatisticsDocument struct {
+	// The number of requests recorded with borrowed reservoir quota.
+	BorrowCount int64 `json:"BorrowCount"`
+
+	// A unique identifier for the service in hexadecimal.
+	ClientID string `json:"ClientID"`
+
+	// The number of requests that matched the rule.
+	RequestCount int64 `json:"RequestCount"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
+
+	// The number of requests recorded.
+	SampledCount int64 `json:"SampledCount"`
+
+	// The current time.
+	Timestamp int64 `json:"Timestamp"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html#API_GetSamplingTargets_ResponseSyntax
+type getSamplingTargetsOutput struct {
+	// The last time a user changed the sampling rule configuration. If the sampling
+	// rule configuration changed since the service last retrieved it, the service
+	// should call GetSamplingRules to get the latest version.
+	LastRuleModification int64 `json:"LastRuleModification"`
+
+	// Updated rules that the service should use to sample requests.
+	SamplingTargetDocuments []*samplingTargetDocument `json:"SamplingTargetDocuments"`
+
+	// Information about SamplingStatisticsDocument that X-Ray could not process.
+	UnprocessedStatistics []*unprocessedStatistics `json:"UnprocessedStatistics"`
+}
+
+type samplingTargetDocument struct {
+	// The percentage of matching requests to instrument, after the reservoir is
+	// exhausted.
+	FixedRate float64 `json:"FixedRate"`
+
+	// The number of seconds for the service to wait before getting sampling targets
+	// again.
+	Interval int64 `json:"Interval"`
+
+	// The number of requests per second that X-Ray allocated this service.
+	ReservoirQuota int64 `json:"ReservoirQuota"`
+
+	// When the reservoir quota expires.
+	ReservoirQuotaTTL int64 `json:"ReservoirQuotaTTL"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
+}
+
+type unprocessedStatistics struct {
+	// The error code.
+	ErrorCode string `json:"ErrorCode"`
+
+	// The error message.
+	Message string `json:"Message"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
+}
+
 type xrayAPI interface {
 	GetSamplingRulesPagesWithContext(aws.Context, *xraySvc.GetSamplingRulesInput, func(*xraySvc.GetSamplingRulesOutput, bool) bool, ...request.Option) error
 	GetSamplingTargetsWithContext(aws.Context, *xraySvc.GetSamplingTargetsInput, ...request.Option) (*xraySvc.GetSamplingTargetsOutput, error)
