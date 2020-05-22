@@ -1,11 +1,15 @@
 package sampling
 
 import (
+	"bytes"
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
@@ -21,6 +25,21 @@ import (
 
 const defaultInterval = int64(10)
 const manifestTTL = 3600 // Seconds
+
+var client = &http.Client{
+	Transport: &http.Transport{
+		Proxy: nil, // ignore proxy configure from the environment values
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	},
+}
 
 // https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html#API_GetSamplingRules_RequestBody
 type getSamplingRulesInput struct {
@@ -167,6 +186,9 @@ type CentralizedStrategy struct {
 	// AWS X-Ray client
 	xray xrayAPI
 
+	// Address for X-Ray daemon
+	addr string
+
 	// Unique ID used by XRay service to identify this client
 	clientID string
 
@@ -204,6 +226,7 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 	return &CentralizedStrategy{
 		fallback:     local,
 		xray:         x,
+		addr:         addr,
 		clientID:     fmt.Sprintf("%x", r),
 		pollerCtx:    pollerCtx,
 		pollerCancel: pollerCancel,
@@ -243,6 +266,84 @@ func newXRaySvc(addr string) (*xraySvc.XRay, error) {
 	})
 
 	return x, nil
+}
+
+func (s *CentralizedStrategy) getSamplingRulesPages(ctx context.Context, input *getSamplingRulesInput, callback func(*getSamplingRulesOutput, bool) bool) error {
+	token := input.NextToken
+	for {
+		out, err := s.getSamplingRules(ctx, &getSamplingRulesInput{
+			NextToken: token,
+		})
+		if err != nil {
+			return err
+		}
+		lastPage := out.NextToken == ""
+		if !callback(out, lastPage) || lastPage {
+			break
+		}
+		token = out.NextToken
+	}
+	return nil
+}
+
+// Retrieves all sampling rules.
+//
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html
+func (s *CentralizedStrategy) getSamplingRules(ctx context.Context, input *getSamplingRulesInput) (*getSamplingRulesOutput, error) {
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, "http://"+s.addr+"/GetSamplingRules", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var output getSamplingRulesOutput
+	if err := dec.Decode(&output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
+}
+
+// Requests a sampling quota for rules that the service is using to sample requests.
+//
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html
+func (s *CentralizedStrategy) getSamplingTargets(ctx context.Context, input *getSamplingTargetsInput) (*getSamplingTargetsOutput, error) {
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, "http://"+s.addr+"/SamplingTargets", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var output getSamplingTargetsOutput
+	if err := dec.Decode(&output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
 }
 
 // Close stops polling.
