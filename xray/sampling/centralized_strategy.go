@@ -47,8 +47,8 @@ type getSamplingRulesOutput struct {
 }
 
 type samplingRuleRecord struct {
-	CreatedAt    int64        `json:"CreatedAt"`
-	ModifiedAt   int64        `json:"ModifiedAt"`
+	CreatedAt    float64      `json:"CreatedAt"`
+	ModifiedAt   float64      `json:"ModifiedAt"`
 	SamplingRule samplingRule `json:"SamplingRule"`
 }
 
@@ -128,7 +128,7 @@ type getSamplingTargetsOutput struct {
 	// The last time a user changed the sampling rule configuration. If the sampling
 	// rule configuration changed since the service last retrieved it, the service
 	// should call GetSamplingRules to get the latest version.
-	LastRuleModification string `json:"LastRuleModification"`
+	LastRuleModification int64 `json:"LastRuleModification"`
 
 	// Updated rules that the service should use to sample requests.
 	SamplingTargetDocuments []*samplingTargetDocument `json:"SamplingTargetDocuments"`
@@ -516,12 +516,8 @@ func (s *CentralizedStrategy) refreshQuota() {
 			}
 		}
 		// check the rules are updated.
-		lastModification, err := time.Parse(time.RFC3339Nano, resp.LastRuleModification)
-		if err != nil {
-			needRefresh = true
-		} else {
-			needRefresh = needRefresh || lastModification.After(manifest.RefreshedAt)
-		}
+		lastModification := time.Unix(resp.LastRuleModification, 0)
+		needRefresh = needRefresh || manifest.RefreshedAt.IsZero() || lastModification.After(manifest.RefreshedAt)
 	}
 
 	xraylog.Debug(ctx, "sampling targets are refreshed.")
