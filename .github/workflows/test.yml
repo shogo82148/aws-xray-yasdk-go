@@ -35,7 +35,7 @@ jobs:
         shell: bash
 
       - name: Test
-        run: go test -race -v -coverprofile=profile.cov ./...
+        run: make test
         env:
           GO111MODULE: "on"
         shell: bash
