@@ -1,30 +1,170 @@
 package sampling
 
 import (
+	"bytes"
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/aws/session"
-	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 const defaultInterval = int64(10)
 const manifestTTL = 3600 // Seconds
 
-type xrayAPI interface {
-	GetSamplingRulesPagesWithContext(aws.Context, *xraySvc.GetSamplingRulesInput, func(*xraySvc.GetSamplingRulesOutput, bool) bool, ...request.Option) error
-	GetSamplingTargetsWithContext(aws.Context, *xraySvc.GetSamplingTargetsInput, ...request.Option) (*xraySvc.GetSamplingTargetsOutput, error)
+var client = &http.Client{
+	Transport: &http.Transport{
+		Proxy: nil, // ignore proxy configure from the environment values
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	},
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html#API_GetSamplingRules_RequestBody
+type getSamplingRulesInput struct {
+	NextToken string `json:"NextToken,omitempty"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html#API_GetSamplingRules_ResponseSyntax
+type getSamplingRulesOutput struct {
+	NextToken           string `json:"NextToken,omitempty"`
+	SamplingRuleRecords []*samplingRuleRecord
+}
+
+type samplingRuleRecord struct {
+	CreatedAt    float64      `json:"CreatedAt"`
+	ModifiedAt   float64      `json:"ModifiedAt"`
+	SamplingRule samplingRule `json:"SamplingRule"`
+}
+
+type samplingRule struct {
+	// Matches attributes derived from the request.
+	Attributes map[string]string `json:"Attributes"`
+
+	// The percentage of matching requests to instrument, after the reservoir is
+	// exhausted.
+	FixedRate float64 `json:"FixedRate"`
+
+	// Matches the HTTP method of a request.
+	HTTPMethod string `json:"HTTPMethod"`
+
+	// Matches the hostname from a request URL.
+	Host string `json:"Host"`
+
+	// The priority of the sampling rule.
+	Priority int64 `json:"Priority"`
+
+	// A fixed number of matching requests to instrument per second, prior to applying
+	// the fixed rate. The reservoir is not used directly by services, but applies
+	// to all services using the rule collectively.
+	ReservoirSize int64 `json:"ReservoirSize"`
+
+	// Matches the ARN of the AWS resource on which the service runs.
+	ResourceARN string `json:"ResourceARN"`
+
+	// The ARN of the sampling rule. Specify a rule by either name or ARN, but not
+	// both.
+	RuleARN string `json:"RuleARN"`
+
+	// The name of the sampling rule. Specify a rule by either name or ARN, but
+	// not both.
+	RuleName string `json:"RuleName"`
+
+	// Matches the name that the service uses to identify itself in segments.
+	ServiceName string `json:"ServiceName"`
+
+	// Matches the origin that the service uses to identify its type in segments.
+	ServiceType string `json:"ServiceType"`
+
+	// Matches the path from a request URL.
+	URLPath string `json:"URLPath"`
+
+	// The version of the sampling rule format (1).
+	Version int64 `json:"Version"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html#API_GetSamplingTargets_RequestBody
+type getSamplingTargetsInput struct {
+	SamplingStatisticsDocuments []*samplingStatisticsDocument `json:"SamplingStatisticsDocuments"`
+}
+
+type samplingStatisticsDocument struct {
+	// The number of requests recorded with borrowed reservoir quota.
+	BorrowCount int64 `json:"BorrowCount"`
+
+	// A unique identifier for the service in hexadecimal.
+	ClientID string `json:"ClientID"`
+
+	// The number of requests that matched the rule.
+	RequestCount int64 `json:"RequestCount"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
+
+	// The number of requests recorded.
+	SampledCount int64 `json:"SampledCount"`
+
+	// The current time, in ISO-8601 format (YYYY-MM-DDThh:mm:ss).
+	Timestamp string `json:"Timestamp"`
+}
+
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html#API_GetSamplingTargets_ResponseSyntax
+type getSamplingTargetsOutput struct {
+	// The last time a user changed the sampling rule configuration. If the sampling
+	// rule configuration changed since the service last retrieved it, the service
+	// should call GetSamplingRules to get the latest version.
+	LastRuleModification int64 `json:"LastRuleModification"`
+
+	// Updated rules that the service should use to sample requests.
+	SamplingTargetDocuments []*samplingTargetDocument `json:"SamplingTargetDocuments"`
+
+	// Information about SamplingStatisticsDocument that X-Ray could not process.
+	UnprocessedStatistics []*unprocessedStatistics `json:"UnprocessedStatistics"`
+}
+
+type samplingTargetDocument struct {
+	// The percentage of matching requests to instrument, after the reservoir is
+	// exhausted.
+	FixedRate float64 `json:"FixedRate"`
+
+	// The number of seconds for the service to wait before getting sampling targets
+	// again.
+	Interval int64 `json:"Interval"`
+
+	// The number of requests per second that X-Ray allocated this service.
+	ReservoirQuota int64 `json:"ReservoirQuota"`
+
+	// When the reservoir quota expires, in ISO-8601 format (YYYY-MM-DDThh:mm:ss).
+	ReservoirQuotaTTL string `json:"ReservoirQuotaTTL"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
+}
+
+type unprocessedStatistics struct {
+	// The error code.
+	ErrorCode string `json:"ErrorCode"`
+
+	// The error message.
+	Message string `json:"Message"`
+
+	// The name of the sampling rule.
+	RuleName string `json:"RuleName"`
 }
 
 // CentralizedStrategy is an implementation of SamplingStrategy.
@@ -32,8 +172,8 @@ type CentralizedStrategy struct {
 	// Sampling strategy used if centralized manifest is expired
 	fallback *LocalizedStrategy
 
-	// AWS X-Ray client
-	xray xrayAPI
+	// Address for X-Ray daemon
+	addr string
 
 	// Unique ID used by XRay service to identify this client
 	clientID string
@@ -56,11 +196,6 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 		return nil, err
 	}
 
-	x, err := newXRaySvc(addr)
-	if err != nil {
-		return nil, err
-	}
-
 	// Generate clientID
 	var r [12]byte
 	if _, err := crand.Read(r[:]); err != nil {
@@ -71,7 +206,7 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 
 	return &CentralizedStrategy{
 		fallback:     local,
-		xray:         x,
+		addr:         addr,
 		clientID:     fmt.Sprintf("%x", r),
 		pollerCtx:    pollerCtx,
 		pollerCancel: pollerCancel,
@@ -82,35 +217,82 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 	}, nil
 }
 
-// newXRaySvc returns a new AWS X-Ray client that connects to addr.
-// The requests are unsigned and it is expected that the XRay daemon signs and forwards the requests.
-func newXRaySvc(addr string) (*xraySvc.XRay, error) {
-	url := "http://" + addr
-	// Endpoint resolver for proxying requests through the daemon
-	f := func(service, region string, optFns ...func(*endpoints.Options)) (endpoints.ResolvedEndpoint, error) {
-		return endpoints.ResolvedEndpoint{
-			URL: url,
-		}, nil
+func (s *CentralizedStrategy) getSamplingRulesPages(ctx context.Context, input *getSamplingRulesInput, callback func(*getSamplingRulesOutput, bool) bool) error {
+	token := input.NextToken
+	for {
+		out, err := s.getSamplingRules(ctx, &getSamplingRulesInput{
+			NextToken: token,
+		})
+		if err != nil {
+			return err
+		}
+		lastPage := out.NextToken == ""
+		if !callback(out, lastPage) || lastPage {
+			break
+		}
+		token = out.NextToken
 	}
+	return nil
+}
 
-	// Dummy session for unsigned requests
-	sess, err := session.NewSession(&aws.Config{
-		Region:           aws.String("us-west-1"),
-		Credentials:      credentials.NewStaticCredentials("", "", ""),
-		EndpointResolver: endpoints.ResolverFunc(f),
-	})
+// Retrieves all sampling rules.
+//
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingRules.html
+func (s *CentralizedStrategy) getSamplingRules(ctx context.Context, input *getSamplingRulesInput) (*getSamplingRulesOutput, error) {
+	data, err := json.Marshal(input)
 	if err != nil {
 		return nil, err
 	}
-	x := xraySvc.New(sess)
+	req, err := http.NewRequest(http.MethodPost, "http://"+s.addr+"/GetSamplingRules", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
 
-	// Remove Signer and replace with No-Op handler
-	x.Handlers.Sign.Clear()
-	x.Handlers.Sign.PushBack(func(*request.Request) {
-		// do nothing
-	})
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-	return x, nil
+	dec := json.NewDecoder(resp.Body)
+	var output getSamplingRulesOutput
+	if err := dec.Decode(&output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
+}
+
+// Requests a sampling quota for rules that the service is using to sample requests.
+//
+// https://docs.aws.amazon.com/xray/latest/api/API_GetSamplingTargets.html
+func (s *CentralizedStrategy) getSamplingTargets(ctx context.Context, input *getSamplingTargetsInput) (*getSamplingTargetsOutput, error) {
+	data, err := json.Marshal(input)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPost, "http://"+s.addr+"/SamplingTargets", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	dec := json.NewDecoder(resp.Body)
+	var output getSamplingTargetsOutput
+	if err := dec.Decode(&output); err != nil {
+		return nil, err
+	}
+
+	return &output, nil
 }
 
 // Close stops polling.
@@ -218,35 +400,35 @@ func (s *CentralizedStrategy) refreshRule() {
 	manifest := s.getManifest()
 	rules := make([]*centralizedRule, 0, len(manifest.Rules))
 	quotas := make(map[string]*centralizedQuota, len(manifest.Rules))
-	err := s.xray.GetSamplingRulesPagesWithContext(ctx, &xraySvc.GetSamplingRulesInput{}, func(out *xraySvc.GetSamplingRulesOutput, lastPage bool) bool {
+	err := s.getSamplingRulesPages(ctx, &getSamplingRulesInput{}, func(out *getSamplingRulesOutput, lastPage bool) bool {
 		for _, record := range out.SamplingRuleRecords {
 			r := record.SamplingRule
-			name := aws.StringValue(r.RuleName)
+			name := r.RuleName
 			quota, ok := manifest.Quotas[name]
 			if !ok {
 				// we don't have enough sampling statistics,
 				// so borrow the reservoir quota.
 				quota = &centralizedQuota{
-					fixedRate: aws.Float64Value(r.FixedRate),
+					fixedRate: r.FixedRate,
 				}
 			}
 			rule := &centralizedRule{
 				quota:       quota,
 				ruleName:    name,
-				priority:    aws.Int64Value(r.Priority),
-				host:        aws.StringValue(r.Host),
-				urlPath:     aws.StringValue(r.URLPath),
-				httpMethod:  aws.StringValue(r.HTTPMethod),
-				serviceName: aws.StringValue(r.ServiceName),
-				serviceType: aws.StringValue(r.ServiceType),
+				priority:    r.Priority,
+				host:        r.Host,
+				urlPath:     r.URLPath,
+				httpMethod:  r.HTTPMethod,
+				serviceName: r.ServiceName,
+				serviceType: r.ServiceType,
 			}
 			rules = append(rules, rule)
 			quotas[name] = quota
 			xraylog.Debugf(
 				ctx,
 				"Refresh Sampling Rule: Name: %s, Priority: %d, FixedRate: %f, Host: %s, Method: %s, ServiceName: %s, ServiceType: %s",
-				name, aws.Int64Value(r.Priority), aws.Float64Value(r.FixedRate),
-				aws.StringValue(r.Host), aws.StringValue(r.HTTPMethod), aws.StringValue(r.ServiceName), aws.StringValue(r.ServiceType),
+				name, r.Priority, r.FixedRate,
+				r.Host, r.HTTPMethod, r.ServiceName, r.ServiceType,
 			)
 		}
 		return true
@@ -282,16 +464,16 @@ func (s *CentralizedStrategy) refreshQuota() {
 
 	manifest := s.getManifest()
 	now := time.Now()
-	stats := make([]*xraySvc.SamplingStatisticsDocument, 0, len(manifest.Rules))
+	stats := make([]*samplingStatisticsDocument, 0, len(manifest.Rules))
 	for _, r := range manifest.Rules {
 		stat := r.quota.Stats()
-		stats = append(stats, &xraySvc.SamplingStatisticsDocument{
-			ClientID:     &s.clientID,
-			RuleName:     &r.ruleName,
-			RequestCount: &stat.requests,
-			SampledCount: &stat.sampled,
-			BorrowCount:  &stat.borrowed,
-			Timestamp:    &now,
+		stats = append(stats, &samplingStatisticsDocument{
+			ClientID:     s.clientID,
+			RuleName:     r.ruleName,
+			RequestCount: stat.requests,
+			SampledCount: stat.sampled,
+			BorrowCount:  stat.borrowed,
+			Timestamp:    now.Format(time.RFC3339),
 		})
 		xraylog.Debugf(
 			ctx,
@@ -305,7 +487,7 @@ func (s *CentralizedStrategy) refreshQuota() {
 		if l > maxTargets {
 			l = maxTargets
 		}
-		resp, err := s.xray.GetSamplingTargetsWithContext(ctx, &xraySvc.GetSamplingTargetsInput{
+		resp, err := s.getSamplingTargets(ctx, &getSamplingTargetsInput{
 			SamplingStatisticsDocuments: stats[:l],
 		})
 		stats = stats[l:]
@@ -314,12 +496,19 @@ func (s *CentralizedStrategy) refreshQuota() {
 			continue
 		}
 		for _, doc := range resp.SamplingTargetDocuments {
-			if quota, ok := manifest.Quotas[aws.StringValue(doc.RuleName)]; ok {
-				quota.Update(doc)
+			if quota, ok := manifest.Quotas[doc.RuleName]; ok {
+				if err := quota.update(doc); err != nil {
+					xraylog.Errorf(
+						ctx,
+						"Failed to Refresh Quota: Name: %s, Quota: %d, TTL: %s, Interval: %d, Error: %v",
+						doc.RuleName, doc.ReservoirQuota, doc.ReservoirQuotaTTL, doc.Interval, err,
+					)
+					continue
+				}
 				xraylog.Debugf(
 					ctx,
 					"Refresh Quota: Name: %s, Quota: %d, TTL: %s, Interval: %d",
-					aws.StringValue(doc.RuleName), aws.Int64Value(doc.ReservoirQuota), doc.ReservoirQuotaTTL, aws.Int64Value(doc.Interval),
+					doc.RuleName, doc.ReservoirQuota, doc.ReservoirQuotaTTL, doc.Interval,
 				)
 			} else {
 				// new rule may be added? try to refresh.
@@ -327,7 +516,8 @@ func (s *CentralizedStrategy) refreshQuota() {
 			}
 		}
 		// check the rules are updated.
-		needRefresh = needRefresh || aws.TimeValue(resp.LastRuleModification).After(manifest.RefreshedAt)
+		lastModification := time.Unix(resp.LastRuleModification, 0)
+		needRefresh = needRefresh || manifest.RefreshedAt.IsZero() || lastModification.After(manifest.RefreshedAt)
 	}
 
 	xraylog.Debug(ctx, "sampling targets are refreshed.")

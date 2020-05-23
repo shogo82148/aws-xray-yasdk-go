@@ -6,9 +6,6 @@ import (
 	"math/rand"
 	"sync"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
 type centralizedManifest struct {
@@ -95,12 +92,17 @@ type centralizedQuota struct {
 	currentEpoch int64
 }
 
-func (q *centralizedQuota) Update(doc *xraySvc.SamplingTargetDocument) {
+func (q *centralizedQuota) update(doc *samplingTargetDocument) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	q.fixedRate = aws.Float64Value(doc.FixedRate)
-	q.quota = aws.Int64Value(doc.ReservoirQuota)
-	q.ttl = aws.TimeValue(doc.ReservoirQuotaTTL)
+	q.fixedRate = doc.FixedRate
+	q.quota = doc.ReservoirQuota
+	ttl, err := time.Parse(time.RFC3339Nano, doc.ReservoirQuotaTTL)
+	if err != nil {
+		return err
+	}
+	q.ttl = ttl
+	return nil
 }
 
 // ref. https://docs.aws.amazon.com/xray/latest/devguide/xray-api-sampling.html
