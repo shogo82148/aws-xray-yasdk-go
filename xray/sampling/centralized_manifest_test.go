@@ -61,11 +61,14 @@ func TestCentralizedQuota_Sample(t *testing.T) {
 		randFunc: func() float64 { return random },
 		nowFunc:  func() time.Time { return time.Unix(now, 0) },
 	}
-	quota.update(&samplingTargetDocument{
+	err := quota.update(&samplingTargetDocument{
 		FixedRate:         0.05,
 		ReservoirQuota:    5,
 		ReservoirQuotaTTL: "2001-09-09T01:46:50Z", // 1000000010 in unix epoch
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// first 5 requests consume the quota of the current epoch
 	for i := 0; i < 5; i++ {
