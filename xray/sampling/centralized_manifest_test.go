@@ -5,9 +5,6 @@ import (
 	"sort"
 	"testing"
 	"time"
-
-	"github.com/aws/aws-sdk-go/aws"
-	xraySvc "github.com/aws/aws-sdk-go/service/xray"
 )
 
 func TestCentralizedRule_Match(t *testing.T) {
@@ -64,10 +61,10 @@ func TestCentralizedQuota_Sample(t *testing.T) {
 		randFunc: func() float64 { return random },
 		nowFunc:  func() time.Time { return time.Unix(now, 0) },
 	}
-	quota.Update(&xraySvc.SamplingTargetDocument{
-		FixedRate:         aws.Float64(0.05),
-		ReservoirQuota:    aws.Int64(5),
-		ReservoirQuotaTTL: aws.Time(time.Unix(int64(1000000010), 0)),
+	quota.update(&samplingTargetDocument{
+		FixedRate:         0.05,
+		ReservoirQuota:    5,
+		ReservoirQuotaTTL: "2001-09-09T01:46:50Z", // 1000000010 in unix epoch
 	})
 
 	// first 5 requests consume the quota of the current epoch
