@@ -1,5 +1,9 @@
 name: Test
 on: [push, pull_request]
+
+env:
+  GO111MODULE: "on"
+
 jobs:
 
   test:
@@ -30,14 +34,10 @@ jobs:
 
       - name: Install Dependencies
         run: go mod download
-        env:
-          GO111MODULE: "on"
         shell: bash
 
       - name: Test
         run: make test
-        env:
-          GO111MODULE: "on"
         shell: bash
 
       - name: Send coverage
