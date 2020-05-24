@@ -10,9 +10,7 @@ test:
 	cd xrayaws && go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}=../ && \
 		go test -race -v -coverprofile=profile.cov ./... && \
 		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}
-	cat xrayaws/profile.cov | grep -v '^mode:' >> profile.cov
 
 	cd xrayaws-v2 && go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}=../ && \
 		go test -race -v -coverprofile=profile.cov ./... && \
 		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}
-	cat xrayaws-v2/profile.cov | grep -v '^mode:' >> profile.cov
