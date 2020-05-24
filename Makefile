@@ -1,4 +1,5 @@
 DEP_XRAYAWS=$(shell cat xrayaws/go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
+DEP_XRAYAWS_V2=$(shell cat xrayaws-v2/go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
 
 .PHONEY: test
 test:
@@ -10,3 +11,8 @@ test:
 		go test -race -v -coverprofile=profile.cov ./... && \
 		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}
 	cat xrayaws/profile.cov | grep -v '^mode:' >> profile.cov
+
+	cd xrayaws-v2 && go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}=../ && \
+		go test -race -v -coverprofile=profile.cov ./... && \
+		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}
+	cat xrayaws-v2/profile.cov | grep -v '^mode:' >> profile.cov
