@@ -17,8 +17,6 @@ jobs:
           - windows-latest
           - macos-latest
         go:
-          - '1.11'
-          - '1.12'
           - '1.13'
           - '1.14'
           - '1'
