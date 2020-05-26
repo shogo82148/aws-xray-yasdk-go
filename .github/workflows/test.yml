@@ -40,13 +40,13 @@ jobs:
         shell: bash
         working-directory: xrayaws
         run: |
-          DEP_XRAYAWS=$(cat go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
+          DEP_XRAYAWS=$(shell cat go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
           go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}=../
       - name: "Take care of Multi-Module Repositories: xrayaws-v2"
         shell: bash
         working-directory: xrayaws-v2
         run: |
-          DEP_XRAYAWS=$(cat go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
+          DEP_XRAYAWS=$(shell cat go.mod | grep -v module | grep github.com/shogo82148/aws-xray-yasdk-go | cut -d' ' -f2)
           go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}=../
 
       - name: Send coverage
