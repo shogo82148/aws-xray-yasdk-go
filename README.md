@@ -1,7 +1,7 @@
 # aws-xray-yasdk-go
 Yet Another [AWS X-Ray](https://aws.amazon.com/xray/) SDK for Go
 
-The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.11 and above.
+The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.13 and above.
 
 ## TODO
 
