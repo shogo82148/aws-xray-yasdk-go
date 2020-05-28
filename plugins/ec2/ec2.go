@@ -97,13 +97,13 @@ func (c *client) getInstanceIdentityDocument(ctx context.Context) (*ec2InstanceI
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPut, c.base+"/latest/dynamic/instance-identity/document", nil)
+	req, err := http.NewRequest(http.MethodGet, c.base+"/latest/dynamic/instance-identity/document", nil)
 	if err != nil {
 		return nil, err
 	}
 	req = req.WithContext(ctx)
 	if c.token != "" {
-		req.Header.Set("x-aws-ec2-metadata-token", "10")
+		req.Header.Set("x-aws-ec2-metadata-token", c.token)
 	}
 	resp, err := httpClient.Do(req)
 	if err != nil {
