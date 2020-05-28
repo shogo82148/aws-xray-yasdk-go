@@ -22,7 +22,7 @@ func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{
+		_, err := io.WriteString(w, `{
 			"devpayProductCodes" : null,
 			"marketplaceProductCodes" : null,
 			"accountId" : "445285296882",
@@ -39,6 +39,9 @@ func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
 			"instanceId" : "i-009df055e1f06d17f",
 			"instanceType" : "t3.micro"
 		  }`)
+		if err != nil {
+			t.Error(err)
+		}
 	})
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
@@ -78,7 +81,9 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "token-for-IMDSv2")
+		if _, err := io.WriteString(w, "token-for-IMDSv2"); err != nil {
+			t.Error(err)
+		}
 	})
 	mux.HandleFunc("/latest/dynamic/instance-identity/document", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -89,7 +94,7 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, `{
+		_, err := io.WriteString(w, `{
 			"devpayProductCodes" : null,
 			"marketplaceProductCodes" : null,
 			"accountId" : "445285296882",
@@ -106,6 +111,9 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 			"instanceId" : "i-009df055e1f06d17f",
 			"instanceType" : "t3.micro"
 		  }`)
+		if err != nil {
+			t.Error(err)
+		}
 	})
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
