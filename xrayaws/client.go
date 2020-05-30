@@ -60,7 +60,7 @@ var beforeValidate = request.NamedHandler{
 func (segs *subsegments) afterBuild(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.marshalSeg != nil {
+	if segs.marshalCtx != nil {
 		segs.marshalSeg.Close()
 		segs.marshalCtx, segs.marshalSeg = nil, nil
 	}
@@ -96,7 +96,7 @@ var beforeSign = request.NamedHandler{
 func (segs *subsegments) afterSend(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.attemptSeg != nil {
+	if segs.attemptCtx != nil {
 		if r.Error != nil {
 			// r.Error will be stored into segs.awsSeg,
 			// so we just set fault here.
@@ -135,7 +135,7 @@ var beforeUnmarshalMeta = request.NamedHandler{
 func (segs *subsegments) afterUnmarshalError(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.unmarshalSeg == nil {
+	if segs.unmarshalCtx == nil {
 		return
 	}
 	segs.unmarshalSeg.AddError(r.Error)
@@ -155,7 +155,7 @@ var afterUnmarshalError = request.NamedHandler{
 func (segs *subsegments) afterUnmarshal(r *request.Request) {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
-	if segs.unmarshalSeg == nil {
+	if segs.unmarshalCtx == nil {
 		return
 	}
 	segs.unmarshalSeg.AddError(r.Error)
@@ -177,16 +177,17 @@ func (segs *subsegments) afterComplete(r *request.Request, awsData schema.AWS) {
 	defer segs.mu.Unlock()
 
 	// make share all segments closed.
-	if segs.attemptSeg != nil {
+	if segs.attemptCtx != nil {
 		segs.attemptCancel()
 		segs.attemptSeg.Close()
+		segs.attemptCancel = nil
 		segs.attemptCtx, segs.attemptSeg = nil, nil
 	}
-	if segs.marshalSeg != nil {
+	if segs.marshalCtx != nil {
 		segs.marshalSeg.Close()
 		segs.marshalCtx, segs.marshalSeg = nil, nil
 	}
-	if segs.unmarshalSeg != nil {
+	if segs.unmarshalCtx != nil {
 		segs.unmarshalSeg.Close()
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
