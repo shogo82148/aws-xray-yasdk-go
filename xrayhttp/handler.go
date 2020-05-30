@@ -147,15 +147,10 @@ func clientIP(r *http.Request) (string, bool) {
 	return ip, false
 }
 
-// backport of io.StringWriter from Go 1.11
-type stringWriter interface {
-	WriteString(s string) (n int, err error)
-}
-
 type responseWriter interface {
 	http.ResponseWriter
 	io.ReaderFrom
-	stringWriter
+	io.StringWriter
 }
 
 type serverResponseTracer struct {
@@ -231,7 +226,7 @@ func (rw *serverResponseTracer) CloseNotify() <-chan bool {
 func (rw *serverResponseTracer) WriteString(str string) (int, error) {
 	var size int
 	var err error
-	if s, ok := rw.rw.(stringWriter); ok {
+	if s, ok := rw.rw.(io.StringWriter); ok {
 		size, err = s.WriteString(str)
 	} else {
 		size, err = rw.rw.Write([]byte(str))
