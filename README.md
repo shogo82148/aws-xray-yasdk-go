@@ -18,6 +18,7 @@ The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.13 and above.
 - `AWS_XRAY_TRACING_NAME`: Set a service name that the SDK uses for segments.
 - `AWS_XRAY_DEBUG_MODE`: Set to `TRUE` to configure the SDK to output logs to the console
 - `AWS_XRAY_LOG_LEVEL`: Set a log level for the SDK built in logger. it should be `debug`, `info`, `warn`, `error` or `silent`. This value is ignored if `AWS_XRAY_DEBUG_MODE` is set.
+- `AWS_XRAY_SDK_ENABLED`: Disabling the SDK. It is parsed by [`strconv.ParseBool`](https://golang.org/pkg/strconv/#ParseBool) that accepts `1`, `t`, `T`, `TRUE`, `true`, `True`, `0`, `f`, `F`, `FALSE`, `false`, `False`. The default value is `true`.
 
 ### Code
 
