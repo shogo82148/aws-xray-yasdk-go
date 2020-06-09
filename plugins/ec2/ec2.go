@@ -143,6 +143,8 @@ func Init() {
 		EC2: &schema.EC2{
 			InstanceID:       doc.InstanceID,
 			AvailabilityZone: doc.AvailabilityZone,
+			InstanceSize:     doc.InstanceType,
+			AMIID:            doc.ImageID,
 		},
 	})
 }
