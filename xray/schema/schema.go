@@ -216,6 +216,12 @@ type EC2 struct {
 
 	// The Availability Zone in which the instance is running.
 	AvailabilityZone string `json:"availability_zone,omitempty"`
+
+	// The instance type of the instance.
+	InstanceSize string `json:"instance_size,omitempty"`
+
+	// The Amazon Machine Image ID.
+	AMIID string `json:"ami_id,omitempty"`
 }
 
 // XRay is information about X-Ray SDK.
