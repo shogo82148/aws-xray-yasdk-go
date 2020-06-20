@@ -29,6 +29,7 @@ func (k *contextKey) String() string { return "xray context value " + k.name }
 var (
 	segmentContextKey = &contextKey{"segment"}
 	clientContextKey  = &contextKey{"client"}
+	traceIDContextKey = &contextKey{"trace-id"}
 )
 
 type segmentStatus int
@@ -144,6 +145,19 @@ func NewTraceID() string {
 	return fmt.Sprintf("1-%08x-%x", nowFunc().Unix(), r)
 }
 
+func withTraceID(ctx context.Context, traceID string) context.Context {
+	return context.WithValue(ctx, traceIDContextKey, traceID)
+}
+
+// ContextTraceID returns the trace id associated ctx.
+func ContextTraceID(ctx context.Context) string {
+	id := ctx.Value(traceIDContextKey)
+	if id == nil {
+		return ""
+	}
+	return id.(string)
+}
+
 // NewSegmentID generates a string format of segment ID.
 func NewSegmentID() string {
 	var r [8]byte
@@ -198,6 +212,16 @@ func BeginSegmentWithHeader(ctx context.Context, name, header string) (context.C
 }
 
 func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Request) (context.Context, *Segment) {
+	// inject trace id into the context
+	if r != nil {
+		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
+	}
+	if h.TraceID == "" {
+		h.TraceID = NewTraceID()
+	}
+	ctx = withTraceID(ctx, h.TraceID)
+
+	// return dummy segment if X-Ray SDK is disabled.
 	client := ContextClient(ctx)
 	if client != nil && client.disabled {
 		return BeginDummySegment(ctx)
@@ -215,7 +239,6 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 
 	if r != nil {
 		// Sampling strategy for http calls
-		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
 		switch h.SamplingDecision {
 		case SamplingDecisionSampled:
 			xraylog.Debug(ctx, "Incoming header decided: Sampled=true")
@@ -243,9 +266,6 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 			seg.ruleName = *sd.Rule
 		}
 		xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
-	}
-	if h.TraceID == "" {
-		h.TraceID = NewTraceID()
 	}
 	if seg.sampled {
 		h.SamplingDecision = SamplingDecisionSampled
@@ -482,7 +502,7 @@ func SetFault(ctx context.Context) {
 }
 
 // DownstreamHeader returns a header for passing to downstream calls.
-func (seg *Segment) DownstreamHeader() TraceHeader {
+func (seg *Segment) downstreamHeader() TraceHeader {
 	if seg == nil {
 		return TraceHeader{}
 	}
@@ -496,7 +516,14 @@ func (seg *Segment) DownstreamHeader() TraceHeader {
 
 // DownstreamHeader returns a header for passing to downstream calls.
 func DownstreamHeader(ctx context.Context) TraceHeader {
-	return ContextSegment(ctx).DownstreamHeader()
+	if seg := ContextSegment(ctx); seg != nil {
+		return seg.downstreamHeader()
+	}
+	traceID := ContextTraceID(ctx)
+	return TraceHeader{
+		TraceID:          traceID,
+		SamplingDecision: SamplingDecisionNotSampled,
+	}
 }
 
 // SetNamespace sets namespace
