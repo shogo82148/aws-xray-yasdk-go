@@ -45,7 +45,7 @@ func (r *centralizedRule) Match(req *Request) bool {
 	}
 	return (req.Host == "" || WildcardMatchCaseInsensitive(r.host, req.Host)) &&
 		(req.URL == "" || WildcardMatchCaseInsensitive(r.urlPath, req.URL)) &&
-		(req.Method == "" || WildcardMatchCaseInsensitive(r.urlPath, req.Method)) &&
+		(req.Method == "" || WildcardMatchCaseInsensitive(r.httpMethod, req.Method)) &&
 		(req.ServiceName == "" || WildcardMatchCaseInsensitive(r.serviceName, req.ServiceName)) &&
 		(req.ServiceType == "" || WildcardMatchCaseInsensitive(r.serviceType, req.ServiceType))
 }
