@@ -426,9 +426,9 @@ func (s *CentralizedStrategy) refreshRule() {
 			quotas[name] = quota
 			xraylog.Debugf(
 				ctx,
-				"Refresh Sampling Rule: Name: %s, Priority: %d, FixedRate: %f, Host: %s, Method: %s, ServiceName: %s, ServiceType: %s",
-				name, r.Priority, r.FixedRate,
-				r.Host, r.HTTPMethod, r.ServiceName, r.ServiceType,
+				"Refresh Sampling Rule: Priority: %d, ServiceName: %s, ServiceType: %s, Name: %s, Host: %s, URL: %s, Method: %s, Quota: %d, FixedRate: %f",
+				r.Priority, r.ServiceName, r.ServiceType,
+				name, r.Host, r.HTTPMethod, r.URLPath, quota.quota, r.FixedRate,
 			)
 		}
 		return true
