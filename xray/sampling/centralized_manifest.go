@@ -41,13 +41,14 @@ type centralizedRule struct {
 
 func (r *centralizedRule) Match(req *Request) bool {
 	if req == nil {
-		return true
+		return r.host == "*" && r.urlPath == "*" && r.httpMethod == "*" &&
+			r.serviceName == "*" && r.serviceType == "*"
 	}
-	return (req.Host == "" || WildcardMatchCaseInsensitive(r.host, req.Host)) &&
-		(req.URL == "" || WildcardMatchCaseInsensitive(r.urlPath, req.URL)) &&
-		(req.Method == "" || WildcardMatchCaseInsensitive(r.httpMethod, req.Method)) &&
-		(req.ServiceName == "" || WildcardMatchCaseInsensitive(r.serviceName, req.ServiceName)) &&
-		(req.ServiceType == "" || WildcardMatchCaseInsensitive(r.serviceType, req.ServiceType))
+	return WildcardMatchCaseInsensitive(r.host, req.Host) &&
+		WildcardMatchCaseInsensitive(r.urlPath, req.URL) &&
+		WildcardMatchCaseInsensitive(r.httpMethod, req.Method) &&
+		WildcardMatchCaseInsensitive(r.serviceName, req.ServiceName) &&
+		WildcardMatchCaseInsensitive(r.serviceType, req.ServiceType)
 }
 
 func (r *centralizedRule) Sample() *Decision {
