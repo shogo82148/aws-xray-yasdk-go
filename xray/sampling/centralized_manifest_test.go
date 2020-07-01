@@ -16,7 +16,12 @@ func TestCentralizedRule_Match(t *testing.T) {
 		{
 			req: nil,
 			rule: &centralizedRule{
-				ruleName: "nil Request",
+				ruleName:    "nil Request",
+				host:        "*",
+				httpMethod:  "*",
+				urlPath:     "*",
+				serviceName: "*",
+				serviceType: "*",
 			},
 			want: true,
 		},
@@ -24,6 +29,24 @@ func TestCentralizedRule_Match(t *testing.T) {
 			req: &Request{},
 			rule: &centralizedRule{
 				ruleName: "zero Request",
+			},
+			want: true,
+		},
+		{
+			req: &Request{
+				Host:        "localhost:8080",
+				Method:      "GET",
+				URL:         "/",
+				ServiceName: "foo",
+				ServiceType: "bar",
+			},
+			rule: &centralizedRule{
+				ruleName:    "default",
+				host:        "localhost:8080",
+				httpMethod:  "GET",
+				urlPath:     "/",
+				serviceName: "foo",
+				serviceType: "bar",
 			},
 			want: true,
 		},

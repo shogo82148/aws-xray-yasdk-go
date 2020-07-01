@@ -260,7 +260,10 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 			xraylog.Debugf(ctx, "SamplingStrategy decided: %t", seg.sampled)
 		}
 	} else {
-		sd := client.samplingStrategy.ShouldTrace(nil)
+		sd := client.samplingStrategy.ShouldTrace(&sampling.Request{
+			ServiceName: seg.name,
+			ServiceType: seg.origin,
+		})
 		seg.sampled = sd.Sample
 		if sd.Rule != nil {
 			seg.ruleName = *sd.Rule
