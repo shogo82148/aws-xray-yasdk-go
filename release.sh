@@ -17,3 +17,5 @@ const Version = "$MAJOR.$MINOR.$PATCH"
 EOF
 git add "$CURRENT/xray/version.go"
 git commit -m "bump up v$MAJOR.$MINOR.$PATCH"
+git tag "v$MAJOR.$MINOR.$PATCH"
+git push --tags
