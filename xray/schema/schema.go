@@ -196,6 +196,9 @@ func (aws AWS) SetXRay(xray *XRay) {
 
 // AddLogReferences adds information about Amazon CloudWatch Logs.
 func (aws AWS) AddLogReferences(logs []*LogReference) {
+	if len(logs) == 0 {
+		return
+	}
 	if info, ok := aws["cloudwatch_logs"]; ok {
 		current := info.([]*LogReference)
 		current = append(current, logs...)
