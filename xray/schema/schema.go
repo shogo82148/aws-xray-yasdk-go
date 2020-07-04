@@ -194,6 +194,11 @@ func (aws AWS) SetXRay(xray *XRay) {
 	aws["xray"] = xray
 }
 
+// SetCloudwatchLogs sets information about Amazon CloudWatch Logs.
+func (aws AWS) SetCloudwatchLogs(logs []*LogReference) {
+	aws["cloudwatch_logs"] = logs
+}
+
 // ECS is information about an Amazon ECS container.
 type ECS struct {
 	// The container ID of the container running your application.
@@ -242,6 +247,15 @@ type ElasticBeanstalk struct {
 
 	// number indicating the ID of the last successful deployment to the instance that served the request.
 	DeploymentID int64 `json:"deployment_id,omitempty"`
+}
+
+// LogReference represents a link between a trace segment and supporting CloudWatch logs.
+type LogReference struct {
+	// The log group name associated with the segment.
+	LogGroup string `json:"log_group,omitempty"`
+
+	// the ARN of the log group associated with this reference.
+	ARN string `json:"arn,omitempty"`
 }
 
 // Cause indicates the cause of the error by including a cause object in the segment or subsegment.
