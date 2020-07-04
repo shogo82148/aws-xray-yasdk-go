@@ -194,9 +194,17 @@ func (aws AWS) SetXRay(xray *XRay) {
 	aws["xray"] = xray
 }
 
-// SetCloudwatchLogs sets information about Amazon CloudWatch Logs.
-func (aws AWS) SetCloudwatchLogs(logs []*LogReference) {
-	aws["cloudwatch_logs"] = logs
+// AddLogReferences adds information about Amazon CloudWatch Logs.
+func (aws AWS) AddLogReferences(logs []*LogReference) {
+	if info, ok := aws["cloudwatch_logs"]; ok {
+		current := info.([]*LogReference)
+		current = append(current, logs...)
+		aws["cloudwatch_logs"] = current
+		return
+	}
+	clone := make([]*LogReference, len(logs))
+	copy(clone, logs)
+	aws["cloudwatch_logs"] = clone
 }
 
 // ECS is information about an Amazon ECS container.
