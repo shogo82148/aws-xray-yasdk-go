@@ -45,4 +45,4 @@ func (p cwlogsPlugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 }
 
 // Origin implements xray.Plugin.
-func (cwlogsPlugin) Origin() string { return schema.OriginEKSContainer }
+func (cwlogsPlugin) Origin() string { return "" }
