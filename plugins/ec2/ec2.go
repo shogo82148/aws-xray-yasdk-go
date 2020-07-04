@@ -1,3 +1,19 @@
+// Package ec2 provides a plugin for Amazon Elastic Compute Cloud.
+// The plugin collects the information of EC2 instances, and record them.
+// The instance ID, the availability zone, the instance type, and the AMI ID are available.
+//
+// If CloudWatch Agent is installed in the instance, the plugin collects the CloudWatch Logs Groups.
+// It allows you to view the log of a trace using CloudWatch ServiceLens.
+//
+// To enable this plugin, please import the ec2/init package.
+//
+//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2/init"
+//
+// or if you want to load conditionally at runtime, use Init() function.
+//
+//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2"
+//     ec2.Init()
+//
 package ec2
 
 import (
