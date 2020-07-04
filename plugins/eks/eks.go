@@ -26,7 +26,8 @@ const (
 )
 
 type plugin struct {
-	EKS *schema.EKS
+	EKS           *schema.EKS
+	logReferences []*schema.LogReference
 }
 
 // Init activates EKS Plugin at runtime.
@@ -76,11 +77,18 @@ func Init() {
 		xraylog.Debugf(ctx, "failed to get hostname: %v", err)
 		return
 	}
+	clusterName := clusterName(ctx, client, string(bytes.TrimSpace(token)))
+	containerID := containerID(ctx, cgroupPath)
 	xray.AddPlugin(&plugin{
 		EKS: &schema.EKS{
-			ClusterName: clusterName(ctx, client, string(bytes.TrimSpace(token))),
-			ContainerID: containerID(ctx, cgroupPath),
+			ClusterName: clusterName,
+			ContainerID: containerID,
 			Pod:         hostname,
+		},
+		logReferences: []*schema.LogReference{
+			{
+				LogGroup: "/aws/containerinsights/" + clusterName + "/application",
+			},
 		},
 	})
 }
@@ -91,6 +99,7 @@ func (p *plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 		doc.AWS = schema.AWS{}
 	}
 	doc.AWS.SetEKS(p.EKS)
+	doc.AWS.AddLogReferences(p.logReferences)
 }
 
 // Origin implements Plugin.

@@ -1,3 +1,19 @@
+// Package ec2 provides a plugin for Amazon Elastic Compute Cloud.
+// The plugin collects the information of EC2 instances, and record them.
+// The instance ID, the availability zone, the instance type, and the AMI ID are available.
+//
+// If CloudWatch Agent is installed in the instance, the plugin collects the CloudWatch Logs Groups.
+// It allows you to view the log of a trace using CloudWatch ServiceLens.
+//
+// To enable this plugin, please import the ec2/init package.
+//
+//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2/init"
+//
+// or if you want to load conditionally at runtime, use Init() function.
+//
+//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2"
+//     ec2.Init()
+//
 package ec2
 
 import (
@@ -7,10 +23,14 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 type ec2InstanceIdentityDocument struct {
@@ -123,8 +143,89 @@ func (c *client) getInstanceIdentityDocument(ctx context.Context) (*ec2InstanceI
 	return &doc, nil
 }
 
+// Find logging configure of CloudWatch Agent.
+// https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html#CloudWatch-Agent-Configuration-File-Logssection
+func getLogReference(ctx context.Context) []*schema.LogReference {
+	var path string
+	if programData := os.Getenv("ProgramData"); programData != "" {
+		// Windows
+		path = filepath.Join(programData, "Amazon", "AmazonCloudWatchAgent", "log-config.json")
+	} else if filepath.Separator == '/' {
+		// Linux
+		path = "/opt/aws/amazon-cloudwatch-agent/etc/log-config.json"
+	} else {
+		// Unknown platform
+		return nil
+	}
+	return parseAgentConfig(ctx, path)
+}
+
+func parseAgentConfig(ctx context.Context, path string) []*schema.LogReference {
+	xraylog.Debugf(ctx, "plugin/ec2: loading cloudwatch agent configure file: %s", path)
+
+	f, err := os.Open(path)
+	if err != nil {
+		xraylog.Debugf(ctx, "plugin/ec2: fail to open configure file: %v", err)
+		return nil
+	}
+	defer f.Close()
+
+	var v interface{}
+	dec := json.NewDecoder(f)
+	if err := dec.Decode(&v); err != nil {
+		xraylog.Debugf(ctx, "plugin/ec2: fail to parse configure file: %v", err)
+		return nil
+	}
+
+	var w jsonWalker
+	w.Walk(v)
+	sort.Strings(w.logs)
+
+	logs := make([]*schema.LogReference, 0, len(w.logs))
+	for _, v := range w.logs {
+		logs = append(logs, &schema.LogReference{LogGroup: v})
+	}
+	return logs
+}
+
+type jsonWalker struct {
+	logs []string
+}
+
+func (w *jsonWalker) Walk(v interface{}) {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		for key, value := range v {
+			if key == "log_group_name" {
+				// collect all { "log_group_name": "string value" }
+				if s, ok := value.(string); ok {
+					w.logs = appendIfNotExists(w.logs, s)
+					continue
+				}
+			}
+			w.Walk(value)
+		}
+	case []interface{}:
+		for _, value := range v {
+			w.Walk(value)
+		}
+	}
+}
+
+func appendIfNotExists(slice []string, s string) []string {
+	for _, v := range slice {
+		if v == s {
+			// s is already in slice
+			// no need to append it
+			return slice
+		}
+	}
+	return append(slice, s)
+}
+
 type ec2plugin struct {
-	EC2 *schema.EC2
+	EC2           *schema.EC2
+	logReferences []*schema.LogReference
 }
 
 // Init activates EC2Plugin at runtime.
@@ -137,6 +238,7 @@ func Init() {
 	}
 	doc, err := c.getInstanceIdentityDocument(ctx)
 	if err != nil {
+		xraylog.Debugf(ctx, "plugin/ec2: failed to get identity document: %v", err)
 		return
 	}
 	xray.AddPlugin(&ec2plugin{
@@ -146,6 +248,7 @@ func Init() {
 			InstanceSize:     doc.InstanceType,
 			AMIID:            doc.ImageID,
 		},
+		logReferences: getLogReference(ctx),
 	})
 }
 
@@ -155,6 +258,7 @@ func (p *ec2plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 		doc.AWS = schema.AWS{}
 	}
 	doc.AWS.SetEC2(p.EC2)
+	doc.AWS.AddLogReferences(p.logReferences)
 }
 
 // Origin implements Plugin.

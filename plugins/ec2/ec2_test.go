@@ -3,12 +3,15 @@ package ec2
 import (
 	"context"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
 func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
@@ -136,6 +139,42 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 		PendingTime:      time.Date(2019, time.April, 30, 6, 52, 0, 0, time.UTC),
 		ImageID:          "ami-0f9ae750e8274075b",
 		Architecture:     "x86_64",
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("-want/+got:\n%s", diff)
+	}
+}
+
+func TestParseAgentConfig(t *testing.T) {
+	// prepare configure file for test.
+	tmp, err := ioutil.TempFile("", "*.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmp.Name())
+	_, err = io.WriteString(tmp, `{`+
+		`"log_group_name": "group1",`+ // top level object
+		`"foo": {`+
+		`"log_group_name": "group2"`+ // object in object
+		`},`+
+		`"bar": [`+
+		`"dummy",`+
+		`"dummy",`+
+		`{"log_group_name": "group3" },`+ // object in array
+		`{"log_group_name": 123456 }`+ // the value is a number, it should be ignored.
+		`]}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tmp.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	got := parseAgentConfig(context.Background(), tmp.Name())
+	want := []*schema.LogReference{
+		{LogGroup: "group1"},
+		{LogGroup: "group2"},
+		{LogGroup: "group3"},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("-want/+got:\n%s", diff)
