@@ -10,8 +10,6 @@ github.com/jmespath/go-jmespath v0.3.0/go.mod h1:9QtRXoHjLGCJ5IBSaohpXITPlowMeeY
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/shogo82148/aws-xray-yasdk-go v1.0.0 h1:kBF0vjnfy04IXcztg6Al/W6Ag3sRCYzm5c6s3gHkOhU=
-github.com/shogo82148/aws-xray-yasdk-go v1.0.0/go.mod h1:vssKJCQutIQB0kiC62mHvhJhAYWc/M1dyJ94npGqASI=
 github.com/shogo82148/aws-xray-yasdk-go v1.1.1 h1:MjQsdm9ZDbgQIRcly8LGdouUIdAA6TNoB92Rh1pk8gY=
 github.com/shogo82148/aws-xray-yasdk-go v1.1.1/go.mod h1:vssKJCQutIQB0kiC62mHvhJhAYWc/M1dyJ94npGqASI=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
