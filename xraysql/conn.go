@@ -234,3 +234,21 @@ func (conn *driverConn) CheckNamedValue(nv *driver.NamedValue) (err error) {
 	// fallback to default
 	return defaultCheckNamedValue(nv)
 }
+
+// the same as driver.Validator that is available from Go 1.15 or later.
+// Copied from database/sql/driver/driver.go for supporting old Go versions.
+type validator interface {
+	// IsValid is called prior to placing the connection into the
+	// connection pool. The connection will be discarded if false is returned.
+	IsValid() bool
+}
+
+// IsValid implements driver.Validator.
+// It calls the IsValid method of the original connection.
+// If the original connection does not satisfy "database/sql/driver".Validator, it always returns true.
+func (conn *driverConn) IsValid() bool {
+	if v, ok := conn.Conn.(validator); ok {
+		return v.IsValid()
+	}
+	return true
+}
