@@ -97,6 +97,9 @@ type Service struct {
 	// Version is a string that identifies the version of your application that served the request.
 	Version string `json:"version,omitempty"`
 
+	RuntimeVersion string `json:"runtime_version,omitempty"`
+	Runtime        string `json:"runtime,omitempty"`
+
 	Compiler        string `json:"compiler,omitempty"`
 	CompilerVersion string `json:"compiler_version,omitempty"`
 }
