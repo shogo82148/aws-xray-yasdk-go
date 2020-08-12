@@ -5,7 +5,6 @@ env:
   GO111MODULE: "on"
 
 jobs:
-
   test:
     name: Go ${{ matrix.go }} Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -17,12 +16,12 @@ jobs:
           - windows-latest
           - macos-latest
         go:
-          - '1.13'
-          - '1.14'
-          - '1'
+          - "1"
+          - "1.15"
+          - "1.14"
+          - "1.13"
 
     steps:
-
       - name: Set up Go ${{ matrix.go }}
         uses: actions/setup-go@v2
         with:
