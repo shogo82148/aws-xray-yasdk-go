@@ -97,8 +97,14 @@ type Service struct {
 	// Version is a string that identifies the version of your application that served the request.
 	Version string `json:"version,omitempty"`
 
-	Compiler        string `json:"compiler,omitempty"`
-	CompilerVersion string `json:"compiler_version,omitempty"`
+	RuntimeVersion string `json:"runtime_version,omitempty"`
+	Runtime        string `json:"runtime,omitempty"`
+
+	// Compiler and CompilerVersion will be removed.
+	// They are defined only to keep backward compatibility.
+	// https://github.com/shogo82148/aws-xray-yasdk-go/pull/105
+	Compiler        string `json:"-"`
+	CompilerVersion string `json:"-"`
 }
 
 // HTTP is information about the original HTTP request.

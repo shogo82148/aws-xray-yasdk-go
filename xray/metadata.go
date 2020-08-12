@@ -12,6 +12,6 @@ const Name = "X-Ray YA-SDK for Go"
 // ServiceData is the metadata of the user service.
 // It is used by all segments that X-Ray YA-SDK sends.
 var ServiceData = &schema.Service{
-	Compiler:        runtime.Compiler,
-	CompilerVersion: runtime.Version(),
+	Runtime:        runtime.Compiler,
+	RuntimeVersion: runtime.Version(),
 }
