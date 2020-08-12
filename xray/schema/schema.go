@@ -100,8 +100,11 @@ type Service struct {
 	RuntimeVersion string `json:"runtime_version,omitempty"`
 	Runtime        string `json:"runtime,omitempty"`
 
-	Compiler        string `json:"compiler,omitempty"`
-	CompilerVersion string `json:"compiler_version,omitempty"`
+	// Compiler and CompilerVersion will be removed.
+	// They are defined only to keep backward compatibility.
+	// https://github.com/shogo82148/aws-xray-yasdk-go/pull/105
+	Compiler        string `json:"-"`
+	CompilerVersion string `json:"-"`
 }
 
 // HTTP is information about the original HTTP request.
