@@ -1,3 +1,6 @@
+![Test](https://github.com/shogo82148/aws-xray-yasdk-go/workflows/Test/badge.svg)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/shogo82148/aws-xray-yasdk-go)](https://pkg.go.dev/github.com/shogo82148/aws-xray-yasdk-go)
+
 # aws-xray-yasdk-go
 Yet Another [AWS X-Ray](https://aws.amazon.com/xray/) SDK for Go
 
