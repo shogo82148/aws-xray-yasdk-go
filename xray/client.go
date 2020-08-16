@@ -124,7 +124,7 @@ func (c *Client) emit(ctx context.Context, seg *schema.Segment) {
 	buf := c.pool.Get().(*bytes.Buffer)
 	defer c.pool.Put(buf)
 	buf.Reset()
-	buf.Write(header)
+	buf.Write(header) // fix me
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(seg); err != nil {
 		xraylog.Errorf(ctx, "failed to encode: %v", err)
