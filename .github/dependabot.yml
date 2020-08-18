@@ -3,9 +3,7 @@ updates:
   - package-ecosystem: gomod
     directory: "/xrayaws"
     schedule:
-      interval: weekly
-      time: "20:00"
-    open-pull-requests-limit: 10
+      interval: daily
     ignore:
       - dependency-name: github.com/aws/aws-sdk-go
         versions:
@@ -13,12 +11,8 @@ updates:
   - package-ecosystem: gomod
     directory: "/xrayaws-v2"
     schedule:
-      interval: weekly
-      time: "20:00"
-    open-pull-requests-limit: 10
+      interval: daily
   - package-ecosystem: gomod
     directory: "/"
     schedule:
-      interval: weekly
-      time: "20:00"
-    open-pull-requests-limit: 10
+      interval: daily
