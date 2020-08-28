@@ -221,14 +221,14 @@ type ECS struct {
 	// The container ID of the container running your application.
 	Container string `json:"container,omitempty"`
 
-	ContainerID string `json:"containerId,omitempty"`
+	ContainerID string `json:"container_id,omitempty"`
 }
 
 // EKS is information about an Amazon EKS container.
 type EKS struct {
 	ClusterName string `json:"cluster_name,omitempty"`
 	Pod         string `json:"pod,omitempty"`
-	ContainerID string `json:"containerId,omitempty"`
+	ContainerID string `json:"container_id,omitempty"`
 }
 
 // EC2 is information about an EC2 instance.
