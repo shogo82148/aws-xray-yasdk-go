@@ -201,7 +201,7 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 	}
 	conn.attr.populate(ctx, query)
 	seg.AddError(err)
-	return rows, nil
+	return rows, err
 }
 
 func (conn *driverConn) Close() error {
