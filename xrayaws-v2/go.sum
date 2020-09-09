@@ -14,6 +14,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/shogo82148/aws-xray-yasdk-go v1.1.1 h1:MjQsdm9ZDbgQIRcly8LGdouUIdAA6TNoB92Rh1pk8gY=
 github.com/shogo82148/aws-xray-yasdk-go v1.1.1/go.mod h1:vssKJCQutIQB0kiC62mHvhJhAYWc/M1dyJ94npGqASI=
+github.com/shogo82148/aws-xray-yasdk-go v1.1.2 h1:0tIUx9M/95wZAIq68wma6bsLaCklZNMoXs+wevHGBAE=
+github.com/shogo82148/aws-xray-yasdk-go v1.1.2/go.mod h1:37soCzlVeLwY2/2J9n2gGRLUGKGMTWYOEfut/MxUKvY=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
