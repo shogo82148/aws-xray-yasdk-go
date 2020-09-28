@@ -32,6 +32,10 @@ func RoundTripper(rt http.RoundTripper) http.RoundTripper {
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
+	if _, ok := rt.(*roundtripper); ok {
+		// X-Ray SDK is already installed
+		return rt
+	}
 	return &roundtripper{
 		Base: rt,
 	}
