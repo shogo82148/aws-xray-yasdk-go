@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -178,5 +179,52 @@ func TestParseAgentConfig(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("-want/+got:\n%s", diff)
+	}
+}
+
+func TestGetInstanceIdentityDocument_IMDSEndpointFromEnv(t *testing.T) {
+	var called int32
+	mux := http.NewServeMux()
+	mux.HandleFunc("/latest/api/token", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	})
+	mux.HandleFunc("/latest/dynamic/instance-identity/document", func(w http.ResponseWriter, r *http.Request) {
+		atomic.StoreInt32(&called, 1)
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected http method: want %s, got %s", http.MethodGet, r.Method)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, err := io.WriteString(w, `{
+			"devpayProductCodes" : null,
+			"marketplaceProductCodes" : null,
+			"accountId" : "445285296882",
+			"availabilityZone" : "ap-northeast-1a",
+			"kernelId" : null,
+			"ramdiskId" : null,
+			"pendingTime" : "2019-04-30T06:52:00Z",
+			"architecture" : "x86_64",
+			"privateIp" : "10.0.0.207",
+			"version" : "2017-09-30",
+			"region" : "ap-northeast-1",
+			"imageId" : "ami-0f9ae750e8274075b",
+			"billingProducts" : null,
+			"instanceId" : "i-009df055e1f06d17f",
+			"instanceType" : "t3.micro"
+		  }`)
+		if err != nil {
+			t.Error(err)
+		}
+	})
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	os.Setenv("AWS_EC2_METADATA_SERVICE_ENDPOINT", ts.URL)
+	defer os.Unsetenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+
+	Init()
+
+	if atomic.LoadInt32(&called) != 1 {
+		t.Error("IMDSv1 is not called")
 	}
 }

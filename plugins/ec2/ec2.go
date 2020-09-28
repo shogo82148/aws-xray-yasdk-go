@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -233,8 +234,13 @@ func Init() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	base := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+	if base == "" {
+		base = "http://169.254.169.254"
+	}
+	base = strings.TrimSuffix(base, "/")
 	c := &client{
-		base: "http://169.254.169.254",
+		base: base,
 	}
 	doc, err := c.getInstanceIdentityDocument(ctx)
 	if err != nil {
