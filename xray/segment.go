@@ -337,8 +337,8 @@ func (seg *Segment) Sampled() bool {
 		return false
 	}
 	root := seg.root
-	root.mu.Lock()
-	defer root.mu.Unlock()
+	root.mu.RLock()
+	defer root.mu.RUnlock()
 	return root.sampled
 }
 
@@ -355,6 +355,10 @@ func (seg *Segment) Close() {
 	if seg == nil {
 		return
 	}
+	if !seg.close() {
+		// seg is already closed
+		return
+	}
 	if seg.parent != nil {
 		xraylog.Debugf(seg.ctx, "Closing subsegment named %s", seg.name)
 	} else {
@@ -362,7 +366,6 @@ func (seg *Segment) Close() {
 	}
 	err := recover()
 	seg.AddPanic(err)
-	seg.close()
 	if seg.Sampled() {
 		seg.emit()
 	}
@@ -371,7 +374,7 @@ func (seg *Segment) Close() {
 	}
 }
 
-func (seg *Segment) close() {
+func (seg *Segment) close() bool {
 	root := seg.root
 	root.mu.Lock()
 	defer root.mu.Unlock()
@@ -379,8 +382,12 @@ func (seg *Segment) close() {
 		seg.mu.Lock()
 		defer seg.mu.Unlock()
 	}
+	if !seg.endTime.IsZero() {
+		return false
+	}
 	root.closedSegments++
 	seg.endTime = nowFunc()
+	return true
 }
 
 func (seg *Segment) isRoot() bool {
