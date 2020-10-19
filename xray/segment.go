@@ -741,3 +741,10 @@ func (seg *Segment) AddAnnotationFloat64(key string, value float64) {
 func AddAnnotationFloat64(ctx context.Context, key string, value float64) {
 	ContextSegment(ctx).addAnnotation(key, value)
 }
+
+// DetachContextSegment returns a new context with the existing segment.
+// This is useful for creating background tasks which won't be cancelled
+// when a request completes.
+func DetachContextSegment(ctx context.Context) context.Context {
+	return context.WithValue(context.Background(), segmentContextKey, ContextSegment(ctx))
+}
