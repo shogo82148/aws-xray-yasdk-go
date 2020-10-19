@@ -451,9 +451,9 @@ func TestDetachContextSegment(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 	ctx1, _ := BeginSegment(ctx, "foobar")
 	ctx2 := DetachContextSegment(ctx1)
-	cancel()
+	cancel() // ctx1 is canceled.
 
-	seg := ContextSegment(ctx2)
+	seg := ContextSegment(ctx2) // get segment from ctx2
 	seg.Close()
 
 	want := &schema.Segment{
