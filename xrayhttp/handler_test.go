@@ -141,21 +141,15 @@ func TestHandler_context_canceled(t *testing.T) {
 			t.Error("want not implement http.Pusher, but it does")
 		}
 
-		// return InternalServerError if context canceled
 		select {
 		case <-r.Context().Done():
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusInternalServerError)
-			if _, err := w.Write([]byte("canceled")); err != nil {
-				panic(err)
-			}
-			return
 		default:
+			t.Error("the context should be canceled, but not")
 		}
 
 		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("hello")); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if _, err := w.Write([]byte("canceled")); err != nil {
 			panic(err)
 		}
 	}))
