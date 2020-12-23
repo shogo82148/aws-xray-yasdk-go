@@ -1,6 +1,7 @@
 package xrayhttp
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -118,6 +119,93 @@ func TestHandler(t *testing.T) {
 	}
 	if string(data) != "hello" {
 		t.Errorf("want %s, got %s", "hello", string(data))
+	}
+	if res.Header.Get("Content-Type") != "text/plain" {
+		t.Errorf("want %s, got %s", "text/plain", res.Header.Get("Content-Type"))
+	}
+}
+
+func TestHandler_context_canceled(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	h := Handler(FixedTracingNamer("test"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// check optional interface of http.ResponseWriter
+		if _, ok := w.(http.Hijacker); ok {
+			t.Error("want not implement http.Hijacker, but it does")
+		}
+		if _, ok := w.(http.Flusher); !ok {
+			t.Error("want implement http.Flusher, but it doesn't")
+		}
+		if _, ok := w.(http.Pusher); ok {
+			t.Error("want not implement http.Pusher, but it does")
+		}
+
+		// return InternalServerError if context canceled
+		select {
+		case <-r.Context().Done():
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(http.StatusInternalServerError)
+			if _, err := w.Write([]byte("canceled")); err != nil {
+				panic(err)
+			}
+			return
+		default:
+		}
+
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("hello")); err != nil {
+			panic(err)
+		}
+	}))
+
+	ctx, cancel := context.WithCancel(ctx)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req = req.WithContext(ctx)
+
+	cancel()
+	h.ServeHTTP(rec, req)
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name: "test",
+		HTTP: &schema.HTTP{
+			Request: &schema.HTTPRequest{
+				Method:   http.MethodGet,
+				URL:      "http://example.com",
+				ClientIP: "192.0.2.1",
+			},
+			Response: &schema.HTTPResponse{
+				Status:        http.StatusInternalServerError,
+				ContentLength: 8,
+			},
+		},
+		Subsegments: []*schema.Segment{
+			{Name: "response"},
+		},
+		Service: xray.ServiceData,
+		Error:   true, // should be marked as error, not fault.
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+
+	res := rec.Result()
+	if res.StatusCode != http.StatusInternalServerError {
+		t.Errorf("want %d, got %d", http.StatusInternalServerError, res.StatusCode)
+	}
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "canceled" {
+		t.Errorf("want %s, got %s", "canceled", string(data))
 	}
 	if res.Header.Get("Content-Type") != "text/plain" {
 		t.Errorf("want %s, got %s", "text/plain", res.Header.Get("Content-Type"))

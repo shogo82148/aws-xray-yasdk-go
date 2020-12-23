@@ -109,6 +109,15 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		ContentLength: rw.size,
 	}
 	seg.SetHTTPResponse(responseInfo)
+
+	// Set error flag if http connection is already closed by client.
+	select {
+	case <-ctx.Done():
+		seg.SetError()
+		return
+	default:
+	}
+
 	if rw.status >= 400 && rw.status < 500 {
 		seg.SetError()
 	}
