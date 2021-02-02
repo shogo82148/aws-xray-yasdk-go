@@ -2,15 +2,14 @@ package xrayaws
 
 import (
 	"context"
-	"log"
 	"sync"
 
+	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/smithy-go/middleware"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	_ "github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2/whitelist"
-	_ "github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
 )
 
 //go:generate go run codegen.go
@@ -65,7 +64,7 @@ func (xrayMiddleware) HandleInitialize(
 		ctx: ctx,
 	}
 	ctx = context.WithValue(ctx, segmentsContextKey, segs)
-	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, "TODO")
+	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, awsmiddle.GetSigningName(ctx))
 	defer segs.awsSeg.Close()
 	defer segs.closeExceptRoot() // make share all segments closed
 	segs.awsSeg.SetNamespace("aws")
@@ -130,8 +129,6 @@ func (finalizeMiddleware) HandleFinalize(
 ) (
 	out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
 ) {
-	log.Printf("%#v", in.Request)
-	defer log.Println("end finalize")
 	return next.HandleFinalize(ctx, in)
 }
 
@@ -216,7 +213,7 @@ type option struct {
 }
 
 func (o option) addMiddleware(stack *middleware.Stack) error {
-	stack.Initialize.Add(xrayMiddleware{}, middleware.Before)
+	stack.Initialize.Add(xrayMiddleware{}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
 	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
 	stack.Finalize.Add(finalizeMiddleware{}, middleware.Before)
