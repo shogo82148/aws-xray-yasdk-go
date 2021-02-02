@@ -7,9 +7,11 @@ import (
 	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
-	_ "github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2/whitelist"
+	"github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
 )
 
 //go:generate go run codegen.go
@@ -118,59 +120,71 @@ func (endMarshalMiddleware) HandleBuild(
 	return next.HandleBuild(ctx, in)
 }
 
-type finalizeMiddleware struct{}
+type beginAttemptMiddleware struct{}
 
-func (finalizeMiddleware) ID() string {
-	return "XRayEndMarshalMiddleware"
+func (beginAttemptMiddleware) ID() string {
+	return "XRayBeginAttemptMiddleware"
 }
 
-func (finalizeMiddleware) HandleFinalize(
+func (beginAttemptMiddleware) HandleFinalize(
 	ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler,
 ) (
 	out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
 ) {
+	if segs := contextSubsegments(ctx); segs != nil {
+		segs.mu.Lock()
+		segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
+		var cancel context.CancelFunc
+		ctx, cancel = xrayhttp.WithClientTrace(segs.attemptCtx)
+		segs.attemptCancel = cancel
+		segs.mu.Unlock()
+	}
 	return next.HandleFinalize(ctx, in)
 }
 
-type beginUnmarshalMiddleware struct{}
+type endAttemptMiddleware struct{}
 
-func (beginUnmarshalMiddleware) ID() string {
-	return "XRayBeginUnmarshalMiddleware"
+func (endAttemptMiddleware) ID() string {
+	return "XRayEndAttemptMiddleware"
 }
 
-func (beginUnmarshalMiddleware) HandleDeserialize(
+func (endAttemptMiddleware) HandleDeserialize(
 	ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
 ) (
 	out middleware.DeserializeOutput, metadata middleware.Metadata, err error,
 ) {
-	if segs := contextSubsegments(ctx); segs != nil {
+	segs := contextSubsegments(ctx)
+	if segs != nil {
 		segs.mu.Lock()
+		if segs.attemptCtx != nil {
+			segs.attemptSeg.Close()
+			segs.attemptCancel()
+			segs.attemptCtx, segs.attemptSeg = nil, nil
+			segs.attemptCancel = nil
+		}
 		segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
 		segs.mu.Unlock()
 	}
-	return next.HandleDeserialize(ctx, in)
-}
 
-type endUnmarshalMiddleware struct{}
+	out, metadata, err = next.HandleDeserialize(ctx, in)
 
-func (endUnmarshalMiddleware) ID() string {
-	return "XRayBeginUnmarshalMiddleware"
-}
-
-func (endUnmarshalMiddleware) HandleDeserialize(
-	ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
-) (
-	out middleware.DeserializeOutput, metadata middleware.Metadata, err error,
-) {
-	if segs := contextSubsegments(ctx); segs != nil {
+	if segs != nil {
 		segs.mu.Lock()
-		if segs.unmarshalCtx != nil {
-			segs.unmarshalSeg.Close()
-			segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
-		}
+		segs.unmarshalSeg.AddError(err)
+		segs.unmarshalSeg.Close()
+		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 		segs.mu.Unlock()
+		if err == nil {
+			if smithyResponse, ok := out.RawResponse.(*smithyhttp.Response); ok {
+				resp := smithyResponse.Response
+				segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
+					Status:        resp.StatusCode,
+					ContentLength: resp.ContentLength,
+				})
+			}
+		}
 	}
-	return next.HandleDeserialize(ctx, in)
+	return
 }
 
 func contextSubsegments(ctx context.Context) *subsegments {
@@ -216,8 +230,7 @@ func (o option) addMiddleware(stack *middleware.Stack) error {
 	stack.Initialize.Add(xrayMiddleware{}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
 	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
-	stack.Finalize.Add(finalizeMiddleware{}, middleware.Before)
-	stack.Deserialize.Add(beginUnmarshalMiddleware{}, middleware.Before)
-	stack.Deserialize.Add(endUnmarshalMiddleware{}, middleware.After)
+	stack.Finalize.Add(beginAttemptMiddleware{}, middleware.After)
+	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.Before)
 	return nil
 }
