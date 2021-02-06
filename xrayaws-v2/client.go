@@ -74,8 +74,6 @@ func (xrayMiddleware) HandleInitialize(
 	out, metadata, err = next.HandleInitialize(ctx, in)
 	segs.closeExceptRoot()
 
-	// TODO: record result
-
 	return
 }
 
@@ -164,6 +162,17 @@ func (endAttemptMiddleware) HandleDeserialize(
 		}
 		segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
 		segs.mu.Unlock()
+
+		aws := schema.AWS{
+			"operation": awsmiddle.GetOperationName(ctx),
+			"region":    awsmiddle.GetRegion(ctx),
+		}
+		// TODO: implement me!
+		// if smithyRequest, ok := in.Request.(*smithyhttp.Request); ok {
+		// 	req := smithyRequest.Request
+		// 	aws["request_id"] = req.Header.Get("Amz-Sdk-Invocation-Id")
+		// }
+		segs.awsSeg.SetAWS(aws)
 	}
 
 	out, metadata, err = next.HandleDeserialize(ctx, in)
