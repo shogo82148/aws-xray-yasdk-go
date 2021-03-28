@@ -83,7 +83,7 @@ jobs:
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: profile.cov
+          path-to-profile: xrayaws-v2/profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v2
           parallel: true
 
