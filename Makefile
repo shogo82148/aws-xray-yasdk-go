@@ -5,12 +5,16 @@ DEP_XRAYAWS_V2=$(shell cat xrayaws-v2/go.mod | grep -v module | grep github.com/
 test:
 	go test -race -v -coverprofile=profile.cov ./...
 
+.PHONEY: test-xrayaws
+test-xrayaws:
 	# Take care of Multi-Module Repositories
 	# ref. https://github.com/golang/go/wiki/Modules#faqs--multi-module-repositories
 	cd xrayaws && go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}=../ && \
 		go test -race -v -coverprofile=profile.cov ./... && \
 		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS}
 
+.PHONEY: test-xrayaws-v2
+test-xrayaws-v2:
 	cd xrayaws-v2 && go mod edit -replace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}=../ && \
 		go test -race -v -coverprofile=profile.cov ./... && \
 		go mod edit -dropreplace github.com/shogo82148/aws-xray-yasdk-go@${DEP_XRAYAWS_V2}

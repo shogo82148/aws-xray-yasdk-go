@@ -8,10 +8,13 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/external"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -19,23 +22,39 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2/whitelist"
 )
 
+func ignore(s string) string {
+	var builder strings.Builder
+	builder.Grow(len(s))
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsNumber(ch) {
+			builder.WriteRune('x')
+		} else {
+			builder.WriteRune(ch)
+		}
+	}
+	return builder.String()
+}
+
 func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out := *in
-	out.ID = ""
-	out.TraceID = ""
-	out.ParentID = ""
+	out.ID = ignore(out.ID)
+	out.TraceID = ignore(out.TraceID)
+	out.ParentID = ignore(out.ParentID)
 	out.StartTime = 0
 	out.EndTime = 0
 	out.Subsegments = nil
 	if out.AWS != nil {
 		delete(out.AWS, "xray")
+		if v, ok := out.AWS["request_id"].(string); ok {
+			out.AWS["request_id"] = ignore(v)
+		}
 		if len(out.AWS) == 0 {
 			out.AWS = nil
 		}
 	}
 	if out.Cause != nil {
 		for i := range out.Cause.Exceptions {
-			out.Cause.Exceptions[i].ID = ""
+			out.Cause.Exceptions[i].ID = ignore(out.Cause.Exceptions[i].ID)
 		}
 	}
 	for _, sub := range in.Subsegments {
@@ -65,25 +84,27 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := external.LoadDefaultAWSConfig(
-		external.WithRegion("fake-moon-1"),
-		external.WithCredentialsProvider{
-			CredentialsProvider: aws.AnonymousCredentials,
-		},
-		external.WithEndpointResolverFunc(func(resolver aws.EndpointResolver) aws.EndpointResolver {
-			return aws.ResolveWithEndpointURL(ts.URL)
+
+	var opt config.LoadOptions
+	WithXRay()(&opt)
+	cfg := aws.Config{
+		Region: "fake-moon-1",
+		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				URL:         ts.URL,
+				SigningName: "lambda",
+			}, nil
 		}),
-	)
-	if err != nil {
-		t.Fatal(err)
+		Retryer: func() aws.Retryer {
+			return aws.NopRetryer{}
+		},
+		APIOptions: opt.APIOptions,
 	}
 
 	// start testing
-	svc := lambda.New(cfg)
-	Client(svc.Client)
+	svc := lambda.NewFromConfig(cfg)
 	ctx, root := xray.BeginSegment(ctx, "Test")
-	req := svc.ListFunctionsRequest(&lambda.ListFunctionsInput{})
-	_, err = req.Send(ctx)
+	_, err = svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
 	root.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -95,21 +116,30 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "Test",
+		Name:    "Test",
+		ID:      "xxxxxxxxxxxxxxxx",
+		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
+				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				Subsegments: []*schema.Segment{
-					{Name: "marshal"},
+					{
+						Name: "marshal",
+						ID:   "xxxxxxxxxxxxxxxx",
+					},
 					{
 						Name: "attempt",
+						ID:   "xxxxxxxxxxxxxxxx",
 						Subsegments: []*schema.Segment{
 							{
 								Name: "connect",
+								ID:   "xxxxxxxxxxxxxxxx",
 								Subsegments: []*schema.Segment{
 									{
 										Name: "dial",
+										ID:   "xxxxxxxxxxxxxxxx",
 										Metadata: map[string]interface{}{
 											"http": map[string]interface{}{
 												"dial": map[string]interface{}{
@@ -121,10 +151,16 @@ func TestClient(t *testing.T) {
 									},
 								},
 							},
-							{Name: "request"},
+							{
+								Name: "request",
+								ID:   "xxxxxxxxxxxxxxxx",
+							},
 						},
 					},
-					{Name: "unmarshal"},
+					{
+						Name: "unmarshal",
+						ID:   "xxxxxxxxxxxxxxxx",
+					},
 				},
 				HTTP: &schema.HTTP{
 					Response: &schema.HTTPResponse{
@@ -135,8 +171,8 @@ func TestClient(t *testing.T) {
 				AWS: schema.AWS{
 					"operation":  "ListFunctions",
 					"region":     "fake-moon-1",
-					"request_id": "",
-					"retries":    0.0,
+					"request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+					// "retries":    0.0,
 				},
 			},
 		},
@@ -152,35 +188,35 @@ func TestClient_FailDial(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
 
-	cfg, err := external.LoadDefaultAWSConfig(
-		external.WithRegion("fake-moon-1"),
-		external.WithCredentialsProvider{
-			CredentialsProvider: aws.AnonymousCredentials,
-		},
-		external.WithEndpointResolverFunc(func(resolver aws.EndpointResolver) aws.EndpointResolver {
-			// we expected no Gopher daemon on this computer ʕ◔ϖ◔ʔ
-			return aws.ResolveWithEndpointURL("http://127.0.0.1:70")
+	var opt config.LoadOptions
+	WithXRay()(&opt)
+	cfg := aws.Config{
+		Region: "fake-moon-1",
+		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				// we expected no Gopher daemon on this computer ʕ◔ϖ◔ʔ
+				URL:         "http://127.0.0.1:70",
+				SigningName: "lambda",
+			}, nil
 		}),
-	)
-	if err != nil {
-		t.Fatal(err)
+		Retryer: func() aws.Retryer {
+			return aws.NopRetryer{}
+		},
+		APIOptions: opt.APIOptions,
 	}
 
-	// we know this request will fail, no need to retry.
-	cfg.Retryer = aws.NoOpRetryer{}
-
 	// start testing
-	svc := lambda.New(cfg)
-	Client(svc.Client)
+	svc := lambda.NewFromConfig(cfg)
 	ctx, root := xray.BeginSegment(ctx, "Test")
-	req := svc.ListFunctionsRequest(&lambda.ListFunctionsInput{})
-	_, err = req.Send(ctx)
+	_, err := svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
 	root.Close()
-
+	if err == nil {
+		t.Fatal("want error, but no error")
+	}
 	awsErr := err
 	var urlErr *url.Error
-	if !errors.As(err, &urlErr) {
-		t.Errorf("want *url.Error, but not")
+	if !errors.As(awsErr, &urlErr) {
+		t.Fatal(err)
 	}
 
 	// check the segment
@@ -193,38 +229,49 @@ func TestClient_FailDial(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "Test",
+		Name:    "Test",
+		ID:      "xxxxxxxxxxxxxxxx",
+		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
+				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				Fault:     true,
 				Cause: &schema.Cause{
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: awsErr.Error(),
 							Type:    fmt.Sprintf("%T", awsErr),
 						},
 					},
 				},
 				Subsegments: []*schema.Segment{
-					{Name: "marshal"},
+					{
+						Name: "marshal",
+						ID:   "xxxxxxxxxxxxxxxx",
+					},
 					{
 						Name:  "attempt",
+						ID:    "xxxxxxxxxxxxxxxx",
 						Fault: true,
 						Subsegments: []*schema.Segment{
 							{
 								Name:  "connect",
+								ID:    "xxxxxxxxxxxxxxxx",
 								Fault: true,
 								Subsegments: []*schema.Segment{
 									{
 										Name:  "dial",
+										ID:    "xxxxxxxxxxxxxxxx",
 										Fault: true,
 										Cause: &schema.Cause{
 											WorkingDirectory: wd,
 											Exceptions: []schema.Exception{
 												{
+													ID:      "xxxxxxxxxxxxxxxx",
 													Message: urlErr.Err.Error(),
 													Type:    fmt.Sprintf("%T", urlErr.Err),
 												},
@@ -250,8 +297,8 @@ func TestClient_FailDial(t *testing.T) {
 				AWS: schema.AWS{
 					"operation":  "ListFunctions",
 					"region":     "fake-moon-1",
-					"request_id": "",
-					"retries":    0.0,
+					"request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+					// "retries":    0.0,
 				},
 			},
 		},
@@ -280,28 +327,35 @@ func TestClient_BadRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := external.LoadDefaultAWSConfig(
-		external.WithRegion("fake-moon-1"),
-		external.WithCredentialsProvider{
-			CredentialsProvider: aws.AnonymousCredentials,
-		},
-		external.WithEndpointResolverFunc(func(resolver aws.EndpointResolver) aws.EndpointResolver {
-			return aws.ResolveWithEndpointURL(ts.URL)
+
+	var opt config.LoadOptions
+	WithXRay()(&opt)
+	cfg := aws.Config{
+		Region: "fake-moon-1",
+		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				URL:         ts.URL,
+				SigningName: "lambda",
+			}, nil
 		}),
-	)
-	if err != nil {
-		t.Fatal(err)
+		Retryer: func() aws.Retryer {
+			return aws.NopRetryer{}
+		},
+		APIOptions: opt.APIOptions,
 	}
 
 	// start testing
-	svc := lambda.New(cfg)
-	Client(svc.Client)
+	svc := lambda.NewFromConfig(cfg)
 	ctx, root := xray.BeginSegment(ctx, "Test")
-	req := svc.ListFunctionsRequest(&lambda.ListFunctionsInput{})
-	_, awsErr := req.Send(ctx)
+	_, err = svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
 	root.Close()
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("want error, but no error")
+	}
+	awsErr := err
+	var httpErr *awshttp.ResponseError
+	if !errors.As(err, &httpErr) {
+		t.Error("expected *smithyhttp.ResponseError, but not")
 	}
 
 	// check the segment
@@ -314,31 +368,41 @@ func TestClient_BadRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "Test",
+		Name:    "Test",
+		ID:      "xxxxxxxxxxxxxxxx",
+		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
+				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				Fault:     true,
 				Cause: &schema.Cause{
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: awsErr.Error(),
 							Type:    fmt.Sprintf("%T", awsErr),
 						},
 					},
 				},
 				Subsegments: []*schema.Segment{
-					{Name: "marshal"},
+					{
+						Name: "marshal",
+						ID:   "xxxxxxxxxxxxxxxx",
+					},
 					{
 						Name: "attempt",
+						ID:   "xxxxxxxxxxxxxxxx",
 						Subsegments: []*schema.Segment{
 							{
 								Name: "connect",
+								ID:   "xxxxxxxxxxxxxxxx",
 								Subsegments: []*schema.Segment{
 									{
 										Name: "dial",
+										ID:   "xxxxxxxxxxxxxxxx",
 										Metadata: map[string]interface{}{
 											"http": map[string]interface{}{
 												"dial": map[string]interface{}{
@@ -350,23 +414,27 @@ func TestClient_BadRequest(t *testing.T) {
 									},
 								},
 							},
-							{Name: "request"},
+							{
+								Name: "request",
+								ID:   "xxxxxxxxxxxxxxxx",
+							},
 						},
 					},
-					// AWS SDK v2 skips unmarshal when it gets a request error.
-					// {
-					// 	Name:  "unmarshal",
-					// 	Fault: true,
-					// 	Cause: &schema.Cause{
-					// 		WorkingDirectory: wd,
-					// 		Exceptions: []schema.Exception{
-					// 			{
-					// 				Message: awsErr.Error(),
-					// 				Type:    fmt.Sprintf("%T", awsErr),
-					// 			},
-					// 		},
-					// 	},
-					// },
+					{
+						Name:  "unmarshal",
+						ID:    "xxxxxxxxxxxxxxxx",
+						Fault: true,
+						Cause: &schema.Cause{
+							WorkingDirectory: wd,
+							Exceptions: []schema.Exception{
+								{
+									ID:      "xxxxxxxxxxxxxxxx",
+									Message: httpErr.Error(),
+									Type:    fmt.Sprintf("%T", httpErr),
+								},
+							},
+						},
+					},
 				},
 				HTTP: &schema.HTTP{
 					Response: &schema.HTTPResponse{
@@ -377,8 +445,8 @@ func TestClient_BadRequest(t *testing.T) {
 				AWS: schema.AWS{
 					"operation":  "ListFunctions",
 					"region":     "fake-moon-1",
-					"request_id": "",
-					"retries":    0.0,
+					"request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+					// "retries":    0.0,
 				},
 			},
 		},
@@ -391,7 +459,6 @@ func TestClient_BadRequest(t *testing.T) {
 
 func TestGetValue(t *testing.T) {
 	type Foo struct {
-		_   struct{}
 		Bar int
 	}
 

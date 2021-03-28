@@ -2,12 +2,14 @@ package xrayaws
 
 import (
 	"context"
-	"errors"
-	"net/http"
 	"reflect"
 	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/smithy-go"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2/whitelist"
@@ -30,154 +32,11 @@ type subsegments struct {
 	unmarshalSeg  *xray.Segment
 }
 
-func contextSubsegments(ctx context.Context) *subsegments {
-	segs := ctx.Value(segmentsContextKey)
-	if segs == nil {
-		return nil
-	}
-	return segs.(*subsegments)
-}
-
-func (segs *subsegments) beforeValidate(r *aws.Request) {
-	ctx := context.WithValue(r.Context(), segmentsContextKey, segs)
-	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, r.Metadata.EndpointsID)
-	r.SetContext(ctx)
-	segs.awsSeg.SetNamespace("aws")
-	r.HTTPRequest.Header.Set(xray.TraceIDHeaderKey, xray.DownstreamHeader(segs.awsCtx).String())
-
-	segs.marshalCtx, segs.marshalSeg = xray.BeginSubsegment(segs.awsCtx, "marshal")
-}
-
-var beforeValidate = aws.NamedHandler{
-	Name: "XRayBeforeValidateHandler",
-	Fn: func(r *aws.Request) {
-		segs := &subsegments{
-			ctx: r.Context(),
-		}
-		segs.beforeValidate(r)
-	},
-}
-
-func (segs *subsegments) afterBuild(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	if segs.marshalSeg != nil {
-		segs.marshalSeg.Close()
-		segs.marshalCtx, segs.marshalSeg = nil, nil
-	}
-}
-
-var afterBuild = aws.NamedHandler{
-	Name: "XRayAfterBuildHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.Context()); segs != nil {
-			segs.afterBuild(r)
-		}
-	},
-}
-
-func (segs *subsegments) beforeSign(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
-	ctx, cancel := xrayhttp.WithClientTrace(segs.attemptCtx)
-	segs.attemptCancel = cancel
-	r.SetContext(ctx)
-}
-
-var beforeSign = aws.NamedHandler{
-	Name: "XRayBeforeSignHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.Context()); segs != nil {
-			segs.beforeSign(r)
-		}
-	},
-}
-
-func (segs *subsegments) afterSend(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	if segs.attemptCtx != nil {
-		if r.Error != nil {
-			// r.Error will be stored into segs.awsSeg,
-			// so we just set fault here.
-			segs.attemptSeg.SetFault()
-		}
-		segs.attemptCancel()
-		segs.attemptSeg.Close()
-		segs.attemptCtx, segs.attemptSeg = nil, nil
-	}
-}
-
-var afterSend = aws.NamedHandler{
-	Name: "XRayAfterSendHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.Context()); segs != nil {
-			segs.afterSend(r)
-		}
-	},
-}
-
-func (segs *subsegments) beforeUnmarshalMeta(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
-}
-
-var beforeUnmarshalMeta = aws.NamedHandler{
-	Name: "XRayBeforeUnmarshalMetaHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.Context()); segs != nil {
-			segs.beforeUnmarshalMeta(r)
-		}
-	},
-}
-
-func (segs *subsegments) afterUnmarshalError(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	if segs.unmarshalCtx == nil {
-		return
-	}
-	segs.unmarshalSeg.AddError(r.Error)
-	segs.unmarshalSeg.Close()
-	segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
-}
-
-var afterUnmarshalError = aws.NamedHandler{
-	Name: "XRayAfterUnmarshalErrorHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.Context()); segs != nil {
-			segs.afterUnmarshalError(r)
-		}
-	},
-}
-
-func (segs *subsegments) afterUnmarshal(r *aws.Request) {
-	segs.mu.Lock()
-	defer segs.mu.Unlock()
-	if segs.unmarshalCtx == nil {
-		return
-	}
-	segs.unmarshalSeg.AddError(r.Error)
-	segs.unmarshalSeg.Close()
-	segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
-}
-
-var afterUnmarshal = aws.NamedHandler{
-	Name: "XRayAfterUnmarshalHandler",
-	Fn: func(r *aws.Request) {
-		if segs := contextSubsegments(r.HTTPRequest.Context()); segs != nil {
-			segs.afterUnmarshal(r)
-		}
-	},
-}
-
-func (segs *subsegments) afterComplete(r *aws.Request, awsData schema.AWS) {
+// close all segments except root.
+func (segs *subsegments) closeExceptRoot() {
 	segs.mu.Lock()
 	defer segs.mu.Unlock()
 
-	// make share all segments closed.
 	if segs.attemptCtx != nil {
 		segs.attemptCancel()
 		segs.attemptSeg.Close()
@@ -192,28 +51,179 @@ func (segs *subsegments) afterComplete(r *aws.Request, awsData schema.AWS) {
 		segs.unmarshalSeg.Close()
 		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
 	}
+}
 
-	if resp := r.HTTPResponse; resp != nil {
-		segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
-			Status:        resp.StatusCode,
-			ContentLength: resp.ContentLength,
+type xrayMiddleware struct {
+	o *option
+}
+
+func (xrayMiddleware) ID() string {
+	return "XRayMiddleware"
+}
+
+func (m xrayMiddleware) HandleInitialize(
+	ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
+) (
+	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
+) {
+	segs := &subsegments{
+		ctx: ctx,
+	}
+	ctx = context.WithValue(ctx, segmentsContextKey, segs)
+	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, awsmiddle.GetSigningName(ctx))
+	defer segs.awsSeg.Close()
+	defer segs.closeExceptRoot() // make share all segments closed
+	segs.awsSeg.SetNamespace("aws")
+
+	out, metadata, err = next.HandleInitialize(ctx, in)
+	if err != nil {
+		segs.awsSeg.AddError(&smithy.OperationError{
+			ServiceID:     awsmiddle.GetServiceID(ctx),
+			OperationName: awsmiddle.GetOperationName(ctx),
+			Err:           err,
 		})
+	}
+	aws := schema.AWS{}
+	m.o.insertParameter(aws, awsmiddle.GetSigningName(ctx), awsmiddle.GetOperationName(ctx), in.Parameters, out.Result)
+	segs.awsSeg.SetAWS(aws)
 
-		// record the s3 extend request id.
-		if ext := resp.Header.Get("x-amz-id-2"); ext != "" {
-			awsData.Set("id_2", ext)
+	segs.closeExceptRoot()
+
+	return
+}
+
+type beginMarshalMiddleware struct{}
+
+func (beginMarshalMiddleware) ID() string {
+	return "XRayBeginMarshalMiddleware"
+}
+
+func (beginMarshalMiddleware) HandleSerialize(
+	ctx context.Context, in middleware.SerializeInput, next middleware.SerializeHandler,
+) (
+	out middleware.SerializeOutput, metadata middleware.Metadata, err error,
+) {
+	if segs := contextSubsegments(ctx); segs != nil {
+		segs.mu.Lock()
+		segs.marshalCtx, segs.marshalSeg = xray.BeginSubsegment(segs.awsCtx, "marshal")
+		segs.mu.Unlock()
+	}
+	return next.HandleSerialize(ctx, in)
+}
+
+type endMarshalMiddleware struct{}
+
+func (endMarshalMiddleware) ID() string {
+	return "XRayEndMarshalMiddleware"
+}
+
+func (endMarshalMiddleware) HandleBuild(
+	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
+) (
+	out middleware.BuildOutput, metadata middleware.Metadata, err error,
+) {
+	if segs := contextSubsegments(ctx); segs != nil {
+		segs.mu.Lock()
+		if segs.marshalCtx != nil {
+			segs.marshalSeg.Close()
+			segs.marshalCtx, segs.marshalSeg = nil, nil
+		}
+		segs.mu.Unlock()
+	}
+	return next.HandleBuild(ctx, in)
+}
+
+type beginAttemptMiddleware struct{}
+
+func (beginAttemptMiddleware) ID() string {
+	return "XRayBeginAttemptMiddleware"
+}
+
+func (beginAttemptMiddleware) HandleDeserialize(
+	ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
+) (
+	out middleware.DeserializeOutput, metadata middleware.Metadata, err error,
+) {
+	segs := contextSubsegments(ctx)
+	if segs != nil {
+		segs.mu.Lock()
+		segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
+		var cancel context.CancelFunc
+		ctx, cancel = xrayhttp.WithClientTrace(segs.attemptCtx)
+		segs.attemptCancel = cancel
+		segs.mu.Unlock()
+	}
+	out, metadata, err = next.HandleDeserialize(ctx, in)
+	if segs != nil {
+		segs.mu.Lock()
+		if segs.unmarshalCtx != nil {
+			segs.unmarshalSeg.AddError(err)
+			segs.unmarshalSeg.Close()
+			segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
+		}
+		segs.mu.Unlock()
+		if smithyResponse, ok := out.RawResponse.(*smithyhttp.Response); ok {
+			resp := smithyResponse.Response
+			segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
+				Status:        resp.StatusCode,
+				ContentLength: resp.ContentLength,
+			})
 		}
 	}
-	segs.awsSeg.SetAWS(awsData)
+	return
+}
 
-	var v interface{ StatusCode() int }
-	if errors.As(r.Error, &v) {
-		if v.StatusCode() == http.StatusTooManyRequests {
-			segs.awsSeg.SetThrottle()
+type endAttemptMiddleware struct{}
+
+func (endAttemptMiddleware) ID() string {
+	return "XRayEndAttemptMiddleware"
+}
+
+func (endAttemptMiddleware) HandleDeserialize(
+	ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
+) (
+	out middleware.DeserializeOutput, metadata middleware.Metadata, err error,
+) {
+	segs := contextSubsegments(ctx)
+	if segs != nil {
+		aws := schema.AWS{
+			"operation": awsmiddle.GetOperationName(ctx),
+			"region":    awsmiddle.GetRegion(ctx),
 		}
+		if smithyRequest, ok := in.Request.(*smithyhttp.Request); ok {
+			req := smithyRequest.Request
+			aws["request_id"] = req.Header.Get("Amz-Sdk-Invocation-Id")
+		}
+		segs.awsSeg.SetAWS(aws)
 	}
-	segs.awsSeg.AddError(r.Error)
-	segs.awsSeg.Close()
+	out, metadata, err = next.HandleDeserialize(ctx, in)
+	if segs != nil {
+		segs.mu.Lock()
+		if segs.attemptCtx != nil {
+			if err != nil {
+				// r.Error will be stored into segs.awsSeg,
+				// so we just set fault here.
+				segs.attemptSeg.SetFault()
+			}
+			segs.attemptSeg.Close()
+			segs.attemptCancel()
+			segs.attemptCtx, segs.attemptSeg = nil, nil
+			segs.attemptCancel = nil
+		}
+		if err == nil {
+			segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
+		}
+		segs.mu.Unlock()
+	}
+	return
+}
+
+func contextSubsegments(ctx context.Context) *subsegments {
+	segs := ctx.Value(segmentsContextKey)
+	if segs == nil {
+		return nil
+	}
+	return segs.(*subsegments)
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
@@ -226,80 +236,56 @@ func (k *contextKey) String() string { return "xrayaws-v2 context value " + k.na
 
 var segmentsContextKey = &contextKey{"segments"}
 
-func pushHandlers(handlers *aws.Handlers, list *whitelist.Whitelist) {
-	handlers.Validate.PushFrontNamed(beforeValidate)
-	handlers.Build.PushBackNamed(afterBuild)
-	handlers.Sign.PushFrontNamed(beforeSign)
-	handlers.Send.PushBackNamed(afterSend)
-	handlers.Unmarshal.PushFrontNamed(beforeUnmarshalMeta)
-	handlers.UnmarshalError.PushBackNamed(afterUnmarshalError)
-	handlers.Unmarshal.PushBackNamed(afterUnmarshal)
-	handlers.Complete.PushBackNamed(completeHandler(list))
+// WithXRay is the X-Ray tracing option.
+func WithXRay() config.LoadOptionsFunc {
+	return WithWhitelist(defaultWhitelist)
 }
 
-// Client adds X-Ray tracing to an AWS client.
-func Client(c *aws.Client) *aws.Client {
-	if c == nil {
-		panic("Please initialize the provided AWS client before passing to the Client() method.")
-	}
-	pushHandlers(&c.Handlers, defaultWhitelist)
-	return c
-}
-
-// ClientWithWhitelist adds X-Ray tracing to an AWS client with custom whitelist.
-func ClientWithWhitelist(c *aws.Client, whitelist *whitelist.Whitelist) *aws.Client {
-	if c == nil {
-		panic("Please initialize the provided AWS client before passing to the Client() method.")
-	}
-	pushHandlers(&c.Handlers, whitelist)
-	return c
-}
-
-func completeHandler(list *whitelist.Whitelist) aws.NamedHandler {
-	if list == nil {
-		list = &whitelist.Whitelist{
-			Services: map[string]*whitelist.Service{},
-		}
-	}
-	return aws.NamedHandler{
-		Name: "XRayCompleteHandler",
-		Fn: func(r *aws.Request) {
-			segs := contextSubsegments(r.HTTPRequest.Context())
-			if segs == nil {
-				return
-			}
-			awsData := schema.AWS{
-				"region":     r.Config.Region,
-				"operation":  r.Operation.Name,
-				"retries":    r.RetryCount,
-				"request_id": r.RequestID,
-			}
-			insertParameter(awsData, r, list)
-			segs.afterComplete(r, awsData)
-		},
+// WithWhitelist returns a X-Ray tracing option with custom whitelist.
+func WithWhitelist(whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
+	return func(o *config.LoadOptions) error {
+		newOption := option{whitelist: whitelist}
+		o.APIOptions = append(
+			o.APIOptions,
+			newOption.addMiddleware,
+		)
+		return nil
 	}
 }
 
-func insertParameter(aws schema.AWS, r *aws.Request, list *whitelist.Whitelist) {
-	service, ok := list.Services[r.Metadata.EndpointsID]
+type option struct {
+	whitelist *whitelist.Whitelist
+}
+
+func (o *option) addMiddleware(stack *middleware.Stack) error {
+	stack.Initialize.Add(xrayMiddleware{o: o}, middleware.After)
+	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
+	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
+	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
+	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
+	return nil
+}
+
+func (o *option) insertParameter(aws schema.AWS, serviceName, operationName string, params, result interface{}) {
+	service, ok := o.whitelist.Services[serviceName]
 	if !ok {
 		return
 	}
-	operation, ok := service.Operations[r.Operation.Name]
+	operation, ok := service.Operations[operationName]
 	if !ok {
 		return
 	}
 	for _, key := range operation.RequestParameters {
-		aws.Set(key, getValue(r.Params, key))
+		aws.Set(key, getValue(params, key))
 	}
 	for key, desc := range operation.RequestDescriptors {
-		insertDescriptor(desc, aws, r.Params, key)
+		insertDescriptor(desc, aws, params, key)
 	}
 	for _, key := range operation.ResponseParameters {
-		aws.Set(key, getValue(r.Data, key))
+		aws.Set(key, getValue(result, key))
 	}
 	for key, desc := range operation.ResponseDescriptors {
-		insertDescriptor(desc, aws, r.Data, key)
+		insertDescriptor(desc, aws, result, key)
 	}
 }
 
@@ -313,8 +299,7 @@ func getValue(v interface{}, key string) interface{} {
 	}
 	typ := v1.Type()
 
-	// i starts 1 because first field is always struct{}
-	for i := 1; i < v1.NumField(); i++ {
+	for i := 0; i < v1.NumField(); i++ {
 		if typ.Field(i).Name == key {
 			return v1.Field(i).Interface()
 		}

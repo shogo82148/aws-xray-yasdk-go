@@ -17,6 +17,7 @@ jobs:
           - macos-latest
         go:
           - "1"
+          - "1.16"
           - "1.15"
           - "1.14"
           - "1.13"
@@ -34,7 +35,9 @@ jobs:
         shell: bash
 
       - name: Test
-        run: make test
+        run: |
+          make test
+          make test-xrayaws
         shell: bash
 
       - name: Send coverage
@@ -43,10 +46,61 @@ jobs:
           path-to-profile: profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}
           parallel: true
+      - name: Send coverage of xrayaws
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: profile.cov
+          flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v1
+          working-directory: xrayaws
+          parallel: true
+
+  test-xrayaws-v2:
+    name: Go ${{ matrix.go }} AWS SDK v2 Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+        go:
+          - "1"
+          - "1.16"
+          - "1.15"
+          # The v2 SDK requires a minimum version of Go 1.15.
+
+    steps:
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: go mod download
+        shell: bash
+
+      - name: Test
+        run: |
+          make test-xrayaws-v2
+        shell: bash
+
+      - name: Send coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: profile.cov
+          flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v2
+          working-directory: xrayaws-v2
+          parallel: true
 
   # notifies that all test jobs are finished.
   finish:
-    needs: test
+    needs:
+      - test
+      - test-xrayaws-v2
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: shogo82148/actions-goveralls@v1
