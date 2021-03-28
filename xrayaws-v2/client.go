@@ -2,6 +2,7 @@ package xrayaws
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
@@ -52,13 +53,15 @@ func (segs *subsegments) closeExceptRoot() {
 	}
 }
 
-type xrayMiddleware struct{}
+type xrayMiddleware struct {
+	o *option
+}
 
 func (xrayMiddleware) ID() string {
 	return "XRayMiddleware"
 }
 
-func (xrayMiddleware) HandleInitialize(
+func (m xrayMiddleware) HandleInitialize(
 	ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler,
 ) (
 	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
@@ -80,6 +83,10 @@ func (xrayMiddleware) HandleInitialize(
 			Err:           err,
 		})
 	}
+	aws := schema.AWS{}
+	m.o.insertParameter(aws, awsmiddle.GetSigningName(ctx), awsmiddle.GetOperationName(ctx), in.Parameters, out.Result)
+	segs.awsSeg.SetAWS(aws)
+
 	segs.closeExceptRoot()
 
 	return
@@ -250,11 +257,86 @@ type option struct {
 	whitelist *whitelist.Whitelist
 }
 
-func (o option) addMiddleware(stack *middleware.Stack) error {
-	stack.Initialize.Add(xrayMiddleware{}, middleware.After)
+func (o *option) addMiddleware(stack *middleware.Stack) error {
+	stack.Initialize.Add(xrayMiddleware{o: o}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
 	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
 	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
 	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
 	return nil
+}
+
+func (o *option) insertParameter(aws schema.AWS, serviceName, operationName string, params, result interface{}) {
+	service, ok := o.whitelist.Services[serviceName]
+	if !ok {
+		return
+	}
+	operation, ok := service.Operations[operationName]
+	if !ok {
+		return
+	}
+	for _, key := range operation.RequestParameters {
+		aws.Set(key, getValue(params, key))
+	}
+	for key, desc := range operation.RequestDescriptors {
+		insertDescriptor(desc, aws, params, key)
+	}
+	for _, key := range operation.ResponseParameters {
+		aws.Set(key, getValue(result, key))
+	}
+	for key, desc := range operation.ResponseDescriptors {
+		insertDescriptor(desc, aws, result, key)
+	}
+}
+
+func getValue(v interface{}, key string) interface{} {
+	v1 := reflect.ValueOf(v)
+	if v1.Kind() == reflect.Ptr {
+		v1 = v1.Elem()
+	}
+	if v1.Kind() != reflect.Struct {
+		return nil
+	}
+	typ := v1.Type()
+
+	for i := 0; i < v1.NumField(); i++ {
+		if typ.Field(i).Name == key {
+			return v1.Field(i).Interface()
+		}
+	}
+	return nil
+}
+
+func insertDescriptor(desc *whitelist.Descriptor, aws schema.AWS, v interface{}, key string) {
+	renameTo := desc.RenameTo
+	if renameTo == "" {
+		renameTo = key
+	}
+	value := getValue(v, key)
+	switch {
+	case desc.Map:
+		if !desc.GetKeys {
+			return
+		}
+		val := reflect.ValueOf(value)
+		if val.Kind() != reflect.Map {
+			return
+		}
+		keySlice := make([]interface{}, 0, val.Len())
+		for _, key := range val.MapKeys() {
+			keySlice = append(keySlice, key.Interface())
+		}
+		aws.Set(renameTo, keySlice)
+	case desc.List:
+		if !desc.GetCount {
+			return
+		}
+		val := reflect.ValueOf(value)
+		if kind := val.Kind(); kind != reflect.Slice && kind != reflect.Array {
+			return
+		}
+		aws.Set(renameTo, val.Len())
+	default:
+		aws.Set(renameTo, value)
+	}
 }

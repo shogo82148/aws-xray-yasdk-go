@@ -19,6 +19,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2/whitelist"
 )
 
 func ignore(s string) string {
@@ -453,5 +454,76 @@ func TestClient_BadRequest(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetValue(t *testing.T) {
+	type Foo struct {
+		Bar int
+	}
+
+	if got, ok := getValue(Foo{Bar: 123}, "Bar").(int); !ok || got != 123 {
+		t.Errorf("want %d, got %d", 123, got)
+	}
+	if got, ok := getValue(&Foo{Bar: 123}, "Bar").(int); !ok || got != 123 {
+		t.Errorf("want %d, got %d", 123, got)
+	}
+	if got := getValue(Foo{Bar: 123}, "FooBar"); got != nil {
+		t.Errorf("want %v, got %v", nil, got)
+	}
+}
+
+func TestInsertDescriptor_map(t *testing.T) {
+	type Map struct {
+		_   struct{}
+		Foo map[string]string
+	}
+	v := Map{Foo: map[string]string{"foo": "bar", "hoge": "fuga"}}
+	aws := schema.AWS{}
+	insertDescriptor(&whitelist.Descriptor{
+		Map:     true,
+		GetKeys: true,
+	}, aws, v, "Foo")
+	got := aws.Get("Foo").([]interface{})
+	if len(got) != 2 {
+		t.Errorf("want 2, got %d", len(got))
+	}
+	a := got[0].(string)
+	b := got[1].(string)
+	if !(a == "foo" && b == "hoge") && !(a == "hoge" && b == "foo") {
+		t.Errorf("want %v, got %v", []string{"foo", "bar"}, got)
+	}
+}
+
+func TestInsertDescriptor_list(t *testing.T) {
+	type Map struct {
+		_   struct{}
+		Foo []string
+	}
+	v := Map{Foo: []string{"foo", "bar", "hoge", "fuga"}}
+	aws := schema.AWS{}
+	insertDescriptor(&whitelist.Descriptor{
+		List:     true,
+		GetCount: true,
+	}, aws, v, "Foo")
+	got := aws.Get("Foo").(int)
+	if got != 4 {
+		t.Errorf("want 4, got %d", got)
+	}
+}
+
+func TestInsertDescriptor_value(t *testing.T) {
+	type Map struct {
+		_   struct{}
+		Foo string
+	}
+	v := Map{Foo: "bar"}
+	aws := schema.AWS{}
+	insertDescriptor(&whitelist.Descriptor{
+		RenameTo: "fizz_bazz",
+	}, aws, v, "Foo")
+	got := aws.Get("fizz_bazz").(string)
+	if got != "bar" {
+		t.Errorf("want bar, got %s", got)
 	}
 }
