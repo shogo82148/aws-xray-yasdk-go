@@ -49,8 +49,9 @@ jobs:
       - name: Send coverage of xrayaws
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: xrayaws/profile.cov
+          path-to-profile: profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v1
+          working-directory: xrayaws
           parallel: true
 
   test-xrayaws-v2:
@@ -89,8 +90,9 @@ jobs:
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: xrayaws-v2/profile.cov
+          path-to-profile: profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v2
+          working-directory: xrayaws-v2
           parallel: true
 
   # notifies that all test jobs are finished.
