@@ -7,7 +7,7 @@ updates:
     ignore:
       - dependency-name: github.com/aws/aws-sdk-go
         versions:
-          - "< 1.37"
+          - "< 1.39"
   - package-ecosystem: gomod
     directory: "/xrayaws-v2"
     schedule:
