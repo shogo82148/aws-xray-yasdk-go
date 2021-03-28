@@ -30,6 +30,9 @@ func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out.Subsegments = nil
 	if out.AWS != nil {
 		delete(out.AWS, "xray")
+		if _, ok := out.AWS["request_id"]; ok {
+			out.AWS["request_id"] = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+		}
 		if len(out.AWS) == 0 {
 			out.AWS = nil
 		}

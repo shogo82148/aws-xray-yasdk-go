@@ -6,6 +6,7 @@ import (
 
 	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/smithy-go"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -72,6 +73,13 @@ func (xrayMiddleware) HandleInitialize(
 	segs.awsSeg.SetNamespace("aws")
 
 	out, metadata, err = next.HandleInitialize(ctx, in)
+	if err != nil {
+		segs.awsSeg.AddError(&smithy.OperationError{
+			ServiceID:     awsmiddle.GetServiceID(ctx),
+			OperationName: awsmiddle.GetOperationName(ctx),
+			Err:           err,
+		})
+	}
 	segs.closeExceptRoot()
 
 	return
@@ -124,12 +132,13 @@ func (beginAttemptMiddleware) ID() string {
 	return "XRayBeginAttemptMiddleware"
 }
 
-func (beginAttemptMiddleware) HandleFinalize(
-	ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler,
+func (beginAttemptMiddleware) HandleDeserialize(
+	ctx context.Context, in middleware.DeserializeInput, next middleware.DeserializeHandler,
 ) (
-	out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
+	out middleware.DeserializeOutput, metadata middleware.Metadata, err error,
 ) {
-	if segs := contextSubsegments(ctx); segs != nil {
+	segs := contextSubsegments(ctx)
+	if segs != nil {
 		segs.mu.Lock()
 		segs.attemptCtx, segs.attemptSeg = xray.BeginSubsegment(segs.awsCtx, "attempt")
 		var cancel context.CancelFunc
@@ -137,7 +146,24 @@ func (beginAttemptMiddleware) HandleFinalize(
 		segs.attemptCancel = cancel
 		segs.mu.Unlock()
 	}
-	return next.HandleFinalize(ctx, in)
+	out, metadata, err = next.HandleDeserialize(ctx, in)
+	if segs != nil {
+		segs.mu.Lock()
+		if segs.unmarshalCtx != nil {
+			segs.unmarshalSeg.AddError(err)
+			segs.unmarshalSeg.Close()
+			segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
+		}
+		segs.mu.Unlock()
+		if smithyResponse, ok := out.RawResponse.(*smithyhttp.Response); ok {
+			resp := smithyResponse.Response
+			segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
+				Status:        resp.StatusCode,
+				ContentLength: resp.ContentLength,
+			})
+		}
+	}
+	return
 }
 
 type endAttemptMiddleware struct{}
@@ -153,45 +179,34 @@ func (endAttemptMiddleware) HandleDeserialize(
 ) {
 	segs := contextSubsegments(ctx)
 	if segs != nil {
+		aws := schema.AWS{
+			"operation": awsmiddle.GetOperationName(ctx),
+			"region":    awsmiddle.GetRegion(ctx),
+		}
+		if smithyRequest, ok := in.Request.(*smithyhttp.Request); ok {
+			req := smithyRequest.Request
+			aws["request_id"] = req.Header.Get("Amz-Sdk-Invocation-Id")
+		}
+		segs.awsSeg.SetAWS(aws)
+	}
+	out, metadata, err = next.HandleDeserialize(ctx, in)
+	if segs != nil {
 		segs.mu.Lock()
 		if segs.attemptCtx != nil {
+			if err != nil {
+				// r.Error will be stored into segs.awsSeg,
+				// so we just set fault here.
+				segs.attemptSeg.SetFault()
+			}
 			segs.attemptSeg.Close()
 			segs.attemptCancel()
 			segs.attemptCtx, segs.attemptSeg = nil, nil
 			segs.attemptCancel = nil
 		}
-		segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
-		segs.mu.Unlock()
-
-		aws := schema.AWS{
-			"operation": awsmiddle.GetOperationName(ctx),
-			"region":    awsmiddle.GetRegion(ctx),
-		}
-		// TODO: implement me!
-		// if smithyRequest, ok := in.Request.(*smithyhttp.Request); ok {
-		// 	req := smithyRequest.Request
-		// 	aws["request_id"] = req.Header.Get("Amz-Sdk-Invocation-Id")
-		// }
-		segs.awsSeg.SetAWS(aws)
-	}
-
-	out, metadata, err = next.HandleDeserialize(ctx, in)
-
-	if segs != nil {
-		segs.mu.Lock()
-		segs.unmarshalSeg.AddError(err)
-		segs.unmarshalSeg.Close()
-		segs.unmarshalCtx, segs.unmarshalSeg = nil, nil
-		segs.mu.Unlock()
 		if err == nil {
-			if smithyResponse, ok := out.RawResponse.(*smithyhttp.Response); ok {
-				resp := smithyResponse.Response
-				segs.awsSeg.SetHTTPResponse(&schema.HTTPResponse{
-					Status:        resp.StatusCode,
-					ContentLength: resp.ContentLength,
-				})
-			}
+			segs.unmarshalCtx, segs.unmarshalSeg = xray.BeginSubsegment(segs.awsCtx, "unmarshal")
 		}
+		segs.mu.Unlock()
 	}
 	return
 }
@@ -239,7 +254,7 @@ func (o option) addMiddleware(stack *middleware.Stack) error {
 	stack.Initialize.Add(xrayMiddleware{}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
 	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
-	stack.Finalize.Add(beginAttemptMiddleware{}, middleware.After)
-	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.Before)
+	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
+	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
 	return nil
 }
