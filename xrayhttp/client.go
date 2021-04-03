@@ -119,6 +119,7 @@ type clientResponseTracer struct {
 	body        io.ReadCloser
 	ctx         context.Context
 	seg         *xray.Segment
+	errClose    error
 }
 
 func (r *clientResponseTracer) GotFirstResponseByte() {
@@ -157,13 +158,13 @@ func (r *clientResponseTracer) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	var err error
 	if r.body != nil {
-		err = r.body.Close()
+		r.errClose = r.body.Close()
+		r.body = nil
 	}
 	if r.ctx != nil {
 		r.seg.Close()
 		r.ctx, r.seg = nil, nil
 	}
-	return err
+	return r.errClose
 }
