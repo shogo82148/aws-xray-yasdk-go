@@ -10,7 +10,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.5.5
 	github.com/kr/text v0.2.0 // indirect
-	github.com/shogo82148/aws-xray-yasdk-go v1.2.1
+	github.com/shogo82148/aws-xray-yasdk-go v1.2.2
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
