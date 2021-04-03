@@ -52,11 +52,23 @@ func TestConnect_postgresql(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -115,11 +127,23 @@ func TestConnect_mysql(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		ID:        "xxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "mysql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -182,11 +206,23 @@ func TestConnect_mssql(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "mssql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -253,11 +289,23 @@ func TestConnect_oracle(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "oracle@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -312,11 +360,23 @@ func TestConnect_ConnContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
