@@ -22,6 +22,7 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws/whitelist"
 )
 
+// we check the format of strings, ignore their values.
 func ignore(s string) string {
 	var builder strings.Builder
 	builder.Grow(len(s))
@@ -35,13 +36,23 @@ func ignore(s string) string {
 	return builder.String()
 }
 
+const timeFilled = 1234567890
+
+// we check wheather time is set
+func ignoreTime(t float64) float64 {
+	if t == 0 {
+		return 0
+	}
+	return timeFilled
+}
+
 func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out := *in
 	out.ID = ignore(out.ID)
 	out.TraceID = ignore(out.TraceID)
 	out.ParentID = ignore(out.ParentID)
-	out.StartTime = 0
-	out.EndTime = 0
+	out.StartTime = ignoreTime(out.StartTime)
+	out.EndTime = ignoreTime(out.EndTime)
 	out.Subsegments = nil
 	if out.AWS != nil {
 		delete(out.AWS, "xray")
@@ -110,30 +121,42 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name:    "Test",
-		ID:      "xxxxxxxxxxxxxxxx",
-		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		Name:      "Test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "aws",
 				Subsegments: []*schema.Segment{
 					{
-						Name: "marshal",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "marshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 					{
-						Name: "attempt",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "attempt",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "connect",
-								ID:   "xxxxxxxxxxxxxxxx",
+								Name:      "connect",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Subsegments: []*schema.Segment{
 									{
-										Name: "dial",
-										ID:   "xxxxxxxxxxxxxxxx",
+										Name:      "dial",
+										ID:        "xxxxxxxxxxxxxxxx",
+										StartTime: timeFilled,
+										EndTime:   timeFilled,
 										Metadata: map[string]interface{}{
 											"http": map[string]interface{}{
 												"dial": map[string]interface{}{
@@ -146,14 +169,18 @@ func TestClient(t *testing.T) {
 								},
 							},
 							{
-								Name: "request",
-								ID:   "xxxxxxxxxxxxxxxx",
+								Name:      "request",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 							},
 						},
 					},
 					{
-						Name: "unmarshal",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "unmarshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 				},
 				HTTP: &schema.HTTP{
@@ -217,13 +244,17 @@ func TestClient_FailDial(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name:    "Test",
-		ID:      "xxxxxxxxxxxxxxxx",
-		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		Name:      "Test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "aws",
 				Fault:     true,
 				Cause: &schema.Cause{
@@ -238,23 +269,31 @@ func TestClient_FailDial(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "marshal",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "marshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 					{
-						Name:  "attempt",
-						ID:    "xxxxxxxxxxxxxxxx",
-						Fault: true,
+						Name:      "attempt",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
 						Subsegments: []*schema.Segment{
 							{
-								Name:  "connect",
-								ID:    "xxxxxxxxxxxxxxxx",
-								Fault: true,
+								Name:      "connect",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Fault:     true,
 								Subsegments: []*schema.Segment{
 									{
-										Name:  "dial",
-										ID:    "xxxxxxxxxxxxxxxx",
-										Fault: true,
+										Name:      "dial",
+										ID:        "xxxxxxxxxxxxxxxx",
+										StartTime: timeFilled,
+										EndTime:   timeFilled,
+										Fault:     true,
 										Cause: &schema.Cause{
 											WorkingDirectory: wd,
 											Exceptions: []schema.Exception{
@@ -345,13 +384,17 @@ func TestClient_BadRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name:    "Test",
-		ID:      "xxxxxxxxxxxxxxxx",
-		TraceID: "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		Name:      "Test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "aws",
 				Fault:     true,
 				Cause: &schema.Cause{
@@ -366,20 +409,28 @@ func TestClient_BadRequest(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "marshal",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "marshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 					{
-						Name: "attempt",
-						ID:   "xxxxxxxxxxxxxxxx",
+						Name:      "attempt",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "connect",
-								ID:   "xxxxxxxxxxxxxxxx",
+								Name:      "connect",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Subsegments: []*schema.Segment{
 									{
-										Name: "dial",
-										ID:   "xxxxxxxxxxxxxxxx",
+										Name:      "dial",
+										ID:        "xxxxxxxxxxxxxxxx",
+										StartTime: timeFilled,
+										EndTime:   timeFilled,
 										Metadata: map[string]interface{}{
 											"http": map[string]interface{}{
 												"dial": map[string]interface{}{
@@ -392,15 +443,19 @@ func TestClient_BadRequest(t *testing.T) {
 								},
 							},
 							{
-								Name: "request",
-								ID:   "xxxxxxxxxxxxxxxx",
+								Name:      "request",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 							},
 						},
 					},
 					{
-						Name:  "unmarshal",
-						ID:    "xxxxxxxxxxxxxxxx",
-						Fault: true,
+						Name:      "unmarshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
 						Cause: &schema.Cause{
 							WorkingDirectory: wd,
 							Exceptions: []schema.Exception{
