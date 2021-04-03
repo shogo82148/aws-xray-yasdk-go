@@ -158,9 +158,13 @@ func (s *streamingStrategyLimitSubsegment) StreamSegment(seg *Segment) []*schema
 	// fast pass for batching all subsegments.
 	if root.totalSegments <= s.limit {
 		if seg.isRoot() {
+			// we can batch all subsegments.
 			return []*schema.Segment{serialize(seg)}
+		} else if root.inProgress() {
+			// skip to emit this segment.
+			// we will emit with other segments.
+			return nil
 		}
-		return nil
 	}
 
 	ctx := &streamingStrategyLimitSubsegmentContext{}
