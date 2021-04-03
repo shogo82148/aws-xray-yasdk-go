@@ -2,7 +2,9 @@ package xraysql
 
 import (
 	"database/sql/driver"
+	"strings"
 	"testing"
+	"unicode"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -14,23 +16,50 @@ import (
 var _ driver.Driver = (*driverDriver)(nil)
 var _ driver.DriverContext = (*driverDriver)(nil)
 
+// we check the format of strings, ignore their values.
+func ignore(s string) string {
+	var builder strings.Builder
+	builder.Grow(len(s))
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsNumber(ch) {
+			builder.WriteRune('x')
+		} else {
+			builder.WriteRune(ch)
+		}
+	}
+	return builder.String()
+}
+
+const timeFilled = 1234567890
+
+// we check wheather time is set
+func ignoreTime(t float64) float64 {
+	if t == 0 {
+		return 0
+	}
+	return timeFilled
+}
+
 func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out := *in
-	out.ID = ""
-	out.TraceID = ""
-	out.ParentID = ""
-	out.StartTime = 0
-	out.EndTime = 0
+	out.ID = ignore(out.ID)
+	out.TraceID = ignore(out.TraceID)
+	out.ParentID = ignore(out.ParentID)
+	out.StartTime = ignoreTime(out.StartTime)
+	out.EndTime = ignoreTime(out.EndTime)
 	out.Subsegments = nil
 	if out.AWS != nil {
 		delete(out.AWS, "xray")
+		if v, ok := out.AWS["request_id"].(string); ok {
+			out.AWS["request_id"] = ignore(v)
+		}
 		if len(out.AWS) == 0 {
 			out.AWS = nil
 		}
 	}
 	if out.Cause != nil {
 		for i := range out.Cause.Exceptions {
-			out.Cause.Exceptions[i].ID = ""
+			out.Cause.Exceptions[i].ID = ignore(out.Cause.Exceptions[i].ID)
 		}
 	}
 	for _, sub := range in.Subsegments {
@@ -78,11 +107,23 @@ func TestOpen_withFallbackConnector(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@fakedb",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -94,6 +135,9 @@ func TestOpen_withFallbackConnector(t *testing.T) {
 			},
 			{
 				Name:      "postgresql@fakedb",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "PING",
@@ -147,11 +191,23 @@ func TestOpen(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@fakedbctx",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -163,6 +219,9 @@ func TestOpen(t *testing.T) {
 			},
 			{
 				Name:      "postgresql@fakedbctx",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "PING",

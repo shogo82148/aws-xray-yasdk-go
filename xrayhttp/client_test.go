@@ -10,21 +10,47 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 )
 
+// we check the format of strings, ignore their values.
+func ignore(s string) string {
+	var builder strings.Builder
+	builder.Grow(len(s))
+	for _, ch := range s {
+		if unicode.IsLetter(ch) || unicode.IsNumber(ch) {
+			builder.WriteRune('x')
+		} else {
+			builder.WriteRune(ch)
+		}
+	}
+	return builder.String()
+}
+
+const timeFilled = 1234567890
+
+// we check wheather time is set
+func ignoreTime(t float64) float64 {
+	if t == 0 {
+		return 0
+	}
+	return timeFilled
+}
+
 func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	out := *in
-	out.ID = ""
-	out.TraceID = ""
-	out.ParentID = ""
-	out.StartTime = 0
-	out.EndTime = 0
+	out.ID = ignore(out.ID)
+	out.TraceID = ignore(out.TraceID)
+	out.ParentID = ignore(out.ParentID)
+	out.StartTime = ignoreTime(out.StartTime)
+	out.EndTime = ignoreTime(out.EndTime)
 	out.Subsegments = nil
 	if out.AWS != nil {
 		delete(out.AWS, "xray")
@@ -34,7 +60,7 @@ func ignoreVariableFieldFunc(in *schema.Segment) *schema.Segment {
 	}
 	if out.Cause != nil {
 		for i := range out.Cause.Exceptions {
-			out.Cause.Exceptions[i].ID = ""
+			out.Cause.Exceptions[i].ID = ignore(out.Cause.Exceptions[i].ID)
 		}
 	}
 	for _, sub := range in.Subsegments {
@@ -94,11 +120,18 @@ func TestClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
 				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
 						Method: http.MethodGet,
@@ -111,10 +144,16 @@ func TestClient(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -126,8 +165,18 @@ func TestClient(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -194,11 +243,18 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
 				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
 						Method: http.MethodGet,
@@ -213,10 +269,16 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 				Throttle: true,
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -228,8 +290,18 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -296,11 +368,18 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
 				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
 						Method: http.MethodGet,
@@ -314,10 +393,16 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 				Fault: true,
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -329,8 +414,18 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -403,10 +498,17 @@ func TestClient_TLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -420,10 +522,16 @@ func TestClient_TLS(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -434,7 +542,10 @@ func TestClient_TLS(t *testing.T) {
 								},
 							},
 							{
-								Name: "tls",
+								Name:      "tls",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"tls": map[string]interface{}{
@@ -447,8 +558,18 @@ func TestClient_TLS(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -524,10 +645,17 @@ func TestClient_DNS(t *testing.T) {
 		"coalesced": false,
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -541,10 +669,16 @@ func TestClient_DNS(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dns",
+								Name:      "dns",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dns": dns,
@@ -552,7 +686,10 @@ func TestClient_DNS(t *testing.T) {
 								},
 							},
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -564,8 +701,18 @@ func TestClient_DNS(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -621,11 +768,18 @@ func TestClient_InvalidDomain(t *testing.T) {
 	}
 
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "domain.invalid",
 				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
 						Method: http.MethodGet,
@@ -637,6 +791,7 @@ func TestClient_InvalidDomain(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: opErr.Error(),
 							Type:    "*net.OpError",
 						},
@@ -644,16 +799,23 @@ func TestClient_InvalidDomain(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name:  "connect",
-						Fault: true,
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
 						Subsegments: []*schema.Segment{
 							{
-								Name:  "dns",
-								Fault: true,
+								Name:      "dns",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Fault:     true,
 								Cause: &schema.Cause{
 									WorkingDirectory: wd,
 									Exceptions: []schema.Exception{
 										{
+											ID:      "xxxxxxxxxxxxxxxx",
 											Message: opErr.Err.Error(),
 											Type:    "*net.DNSError",
 										},
@@ -724,10 +886,17 @@ func TestClient_InvalidAddress(t *testing.T) {
 	}
 
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "127.0.0.1:70",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -740,6 +909,7 @@ func TestClient_InvalidAddress(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: opErr.Error(),
 							Type:    "*net.OpError",
 						},
@@ -747,16 +917,23 @@ func TestClient_InvalidAddress(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name:  "connect",
-						Fault: true,
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
 						Subsegments: []*schema.Segment{
 							{
-								Name:  "dial",
-								Fault: true,
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Fault:     true,
 								Cause: &schema.Cause{
 									WorkingDirectory: wd,
 									Exceptions: []schema.Exception{
 										{
+											ID:      "xxxxxxxxxxxxxxxx",
 											Message: opErr.Error(),
 											Type:    "*net.OpError",
 										},
@@ -835,10 +1012,17 @@ func TestClient_InvalidCertificate(t *testing.T) {
 	}
 
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		ID:        "xxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -851,6 +1035,7 @@ func TestClient_InvalidCertificate(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: urlErr.Err.Error(),
 							Type:    "x509.UnknownAuthorityError",
 						},
@@ -858,11 +1043,17 @@ func TestClient_InvalidCertificate(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name:  "connect",
-						Fault: true,
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -873,12 +1064,16 @@ func TestClient_InvalidCertificate(t *testing.T) {
 								},
 							},
 							{
-								Name:  "tls",
-								Fault: true,
+								Name:      "tls",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Fault:     true,
 								Cause: &schema.Cause{
 									WorkingDirectory: wd,
 									Exceptions: []schema.Exception{
 										{
+											ID:      "xxxxxxxxxxxxxxxx",
 											Message: urlErr.Err.Error(),
 											Type:    "x509.UnknownAuthorityError",
 										},
@@ -962,10 +1157,17 @@ func TestClient_FailToReadResponse(t *testing.T) {
 	}
 
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -978,6 +1180,7 @@ func TestClient_FailToReadResponse(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: urlErr.Err.Error(),
 							Type:    "*errors.errorString",
 						},
@@ -985,10 +1188,16 @@ func TestClient_FailToReadResponse(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -1001,7 +1210,10 @@ func TestClient_FailToReadResponse(t *testing.T) {
 						},
 					},
 					{
-						Name: "request",
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 				},
 			},

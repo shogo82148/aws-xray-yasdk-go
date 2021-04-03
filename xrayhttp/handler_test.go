@@ -88,7 +88,11 @@ func TestHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:   http.MethodGet,
@@ -101,7 +105,12 @@ func TestHandler(t *testing.T) {
 			},
 		},
 		Subsegments: []*schema.Segment{
-			{Name: "response"},
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 		},
 		Service: xray.ServiceData,
 	}
@@ -157,7 +166,11 @@ func TestHandler_context_canceled(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:   http.MethodGet,
@@ -170,7 +183,12 @@ func TestHandler_context_canceled(t *testing.T) {
 			},
 		},
 		Subsegments: []*schema.Segment{
-			{Name: "response"},
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 		},
 		Service: xray.ServiceData,
 		Error:   true, // should be marked as error, not fault.
@@ -217,7 +235,11 @@ func TestHandler_WriteString(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:   http.MethodGet,
@@ -230,7 +252,12 @@ func TestHandler_WriteString(t *testing.T) {
 			},
 		},
 		Subsegments: []*schema.Segment{
-			{Name: "response"},
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 		},
 		Service: xray.ServiceData,
 	}
@@ -280,7 +307,11 @@ func TestHandler_ReadFrom(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:   http.MethodGet,
@@ -293,7 +324,12 @@ func TestHandler_ReadFrom(t *testing.T) {
 			},
 		},
 		Subsegments: []*schema.Segment{
-			{Name: "response"},
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 		},
 		Service: xray.ServiceData,
 	}
@@ -353,7 +389,11 @@ func TestHandler_Hijack(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:    http.MethodGet,
@@ -366,7 +406,12 @@ func TestHandler_Hijack(t *testing.T) {
 			},
 		},
 		Subsegments: []*schema.Segment{
-			{Name: "response"},
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 		},
 		Service: xray.ServiceData,
 	}
@@ -406,7 +451,11 @@ func TestHandler_Panic(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		HTTP: &schema.HTTP{
 			Request: &schema.HTTPRequest{
 				Method:    http.MethodGet,
@@ -417,8 +466,11 @@ func TestHandler_Panic(t *testing.T) {
 		},
 		Subsegments: []*schema.Segment{
 			{
-				Name:  "response",
-				Fault: true,
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Fault:     true,
 			},
 		},
 		Fault: true,
@@ -426,6 +478,7 @@ func TestHandler_Panic(t *testing.T) {
 			WorkingDirectory: wd,
 			Exceptions: []schema.Exception{
 				{
+					ID:      "xxxxxxxxxxxxxxxx",
 					Message: fmt.Sprintf("%T: %s", http.ErrAbortHandler, http.ErrAbortHandler.Error()),
 					Type:    "*xray.errorPanic",
 				},
