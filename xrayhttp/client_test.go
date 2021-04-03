@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -1222,5 +1223,145 @@ func TestClient_FailToReadResponse(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestClient_UnexpectedEOF(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	ch := make(chan xray.TraceHeader, 1)
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		traceHeader := xray.ParseTraceHeader(r.Header.Get(xray.TraceIDHeaderKey))
+		ch <- traceHeader
+		w.Header().Set("Content-Length", "5")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte("hell")); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		client := Client(nil)
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req = req.WithContext(ctx)
+		req.Host = "example.com"
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal()
+		}
+		defer resp.Body.Close()
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != io.ErrUnexpectedEOF {
+			t.Fatal(err)
+		}
+		if string(data) != "hell" {
+			t.Errorf("want %q, got %q", "hello", string(data))
+		}
+	}()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "example.com",
+				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				HTTP: &schema.HTTP{
+					Request: &schema.HTTPRequest{
+						Method: http.MethodGet,
+						URL:    ts.URL,
+					},
+					Response: &schema.HTTPResponse{
+						Status:        http.StatusOK,
+						ContentLength: 5,
+					},
+				},
+				Subsegments: []*schema.Segment{
+					{
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Subsegments: []*schema.Segment{
+							{
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Metadata: map[string]interface{}{
+									"http": map[string]interface{}{
+										"dial": map[string]interface{}{
+											"network": "tcp",
+											"address": u.Host,
+										},
+									},
+								},
+							},
+						},
+					},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Fault:     true,
+						Cause: &schema.Cause{
+							WorkingDirectory: wd,
+							Exceptions: []schema.Exception{
+								{
+									ID:      "xxxxxxxxxxxxxxxx",
+									Message: io.ErrUnexpectedEOF.Error(),
+									Type:    "*errors.errorString",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+
+	traceHeader := <-ch
+	if traceHeader.TraceID != got.TraceID {
+		t.Errorf("invalid trace id, want %s, got %s", got.TraceID, traceHeader.TraceID)
+	}
+	if traceHeader.ParentID != got.ID {
+		t.Errorf("invalid parent id, want %s, got %s", got.ID, traceHeader.ParentID)
 	}
 }

@@ -135,7 +135,20 @@ func (r *clientResponseTracer) Read(b []byte) (int, error) {
 	body := r.body
 	r.mu.RUnlock()
 	if body != nil {
-		return body.Read(b)
+		n, err := body.Read(b)
+		if err != nil {
+			if err == io.EOF {
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				if r.ctx != nil {
+					r.seg.Close()
+					r.ctx, r.seg = nil, nil
+				}
+			} else {
+				r.seg.AddError(err)
+			}
+		}
+		return n, err
 	}
 	return 0, io.EOF
 }
