@@ -156,11 +156,8 @@ func (s *streamingStrategyLimitSubsegment) StreamSegment(seg *Segment) []*schema
 	defer root.mu.Unlock()
 
 	// fast pass for batching all subsegments.
-	if root.totalSegments <= s.limit {
-		if seg.isRoot() {
-			return []*schema.Segment{serialize(seg)}
-		}
-		return nil
+	if root.totalSegments <= s.limit && seg.isRoot() {
+		return []*schema.Segment{serialize(seg)}
 	}
 
 	ctx := &streamingStrategyLimitSubsegmentContext{}
