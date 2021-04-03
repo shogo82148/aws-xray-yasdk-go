@@ -62,11 +62,23 @@ func TestTx_Commit(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -77,7 +89,10 @@ func TestTx_Commit(t *testing.T) {
 				},
 			},
 			{
-				Name: "transaction",
+				Name:      "transaction",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Metadata: map[string]interface{}{
 					"sql": map[string]interface{}{
 						"tx_options": map[string]interface{}{
@@ -89,6 +104,9 @@ func TestTx_Commit(t *testing.T) {
 				Subsegments: []*schema.Segment{
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "BEGIN",
@@ -100,6 +118,9 @@ func TestTx_Commit(t *testing.T) {
 					},
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "INSERT INTO products VALUES (?, ?, ?)",
@@ -111,6 +132,9 @@ func TestTx_Commit(t *testing.T) {
 					},
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "COMMIT",
@@ -180,11 +204,23 @@ func TestTx_Rollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
-			{Name: "detect database type"},
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
 			{
 				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				SQL: &schema.SQL{
 					SanitizedQuery:  "CONNECT",
@@ -195,7 +231,10 @@ func TestTx_Rollback(t *testing.T) {
 				},
 			},
 			{
-				Name: "transaction",
+				Name:      "transaction",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Metadata: map[string]interface{}{
 					"sql": map[string]interface{}{
 						"tx_options": map[string]interface{}{
@@ -208,6 +247,9 @@ func TestTx_Rollback(t *testing.T) {
 				Subsegments: []*schema.Segment{
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "BEGIN",
@@ -219,6 +261,9 @@ func TestTx_Rollback(t *testing.T) {
 					},
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "INSERT INTO products VALUES (?, ?, ?)",
@@ -230,6 +275,9 @@ func TestTx_Rollback(t *testing.T) {
 					},
 					{
 						Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Namespace: "remote",
 						SQL: &schema.SQL{
 							SanitizedQuery:  "ROLLBACK",
