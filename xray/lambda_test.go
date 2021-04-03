@@ -52,7 +52,13 @@ func TestBeginSubsegment_ForLambda_Nested(t *testing.T) {
 	ctx, seg0 := BeginSubsegment(ctx, "subsegment")
 	ctx, seg1 := BeginSubsegment(ctx, "sub-sub-segment")
 	_ = ctx // do something using ctx
+
+	// the order of closing is upside‐down, but is OK.
+	// ref. https://github.com/shogo82148/aws-xray-yasdk-go/pull/160
+	// the seg1 is traced as a segment in progress.
 	seg0.Close()
+
+	// the seg1 is finished and traced
 	seg1.Close()
 
 	got0, err := td.Recv()
