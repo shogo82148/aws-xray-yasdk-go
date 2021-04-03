@@ -1105,10 +1105,17 @@ func TestClient_FailToReadResponse(t *testing.T) {
 	}
 
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -1121,6 +1128,7 @@ func TestClient_FailToReadResponse(t *testing.T) {
 					WorkingDirectory: wd,
 					Exceptions: []schema.Exception{
 						{
+							ID:      "xxxxxxxxxxxxxxxx",
 							Message: urlErr.Err.Error(),
 							Type:    "*errors.errorString",
 						},
@@ -1128,10 +1136,16 @@ func TestClient_FailToReadResponse(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -1144,7 +1158,10 @@ func TestClient_FailToReadResponse(t *testing.T) {
 						},
 					},
 					{
-						Name: "request",
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 					},
 				},
 			},
