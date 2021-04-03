@@ -498,10 +498,17 @@ func TestClient_TLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -515,10 +522,16 @@ func TestClient_TLS(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -529,7 +542,10 @@ func TestClient_TLS(t *testing.T) {
 								},
 							},
 							{
-								Name: "tls",
+								Name:      "tls",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"tls": map[string]interface{}{
@@ -542,8 +558,18 @@ func TestClient_TLS(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
@@ -619,10 +645,17 @@ func TestClient_DNS(t *testing.T) {
 		"coalesced": false,
 	}
 	want := &schema.Segment{
-		Name: "test",
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
 				Name:      "example.com",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
 				Namespace: "remote",
 				HTTP: &schema.HTTP{
 					Request: &schema.HTTPRequest{
@@ -636,10 +669,16 @@ func TestClient_DNS(t *testing.T) {
 				},
 				Subsegments: []*schema.Segment{
 					{
-						Name: "connect",
+						Name:      "connect",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
 						Subsegments: []*schema.Segment{
 							{
-								Name: "dns",
+								Name:      "dns",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dns": dns,
@@ -647,7 +686,10 @@ func TestClient_DNS(t *testing.T) {
 								},
 							},
 							{
-								Name: "dial",
+								Name:      "dial",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
 								Metadata: map[string]interface{}{
 									"http": map[string]interface{}{
 										"dial": map[string]interface{}{
@@ -659,8 +701,18 @@ func TestClient_DNS(t *testing.T) {
 							},
 						},
 					},
-					{Name: "request"},
-					{Name: "response"},
+					{
+						Name:      "request",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "response",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
 				},
 			},
 		},
