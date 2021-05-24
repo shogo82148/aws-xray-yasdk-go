@@ -6,8 +6,7 @@ updates:
       interval: daily
     ignore:
       - dependency-name: github.com/aws/aws-sdk-go
-        versions:
-          - "< 1.39"
+        update-types: ["version-update:semver-patch"]
   - package-ecosystem: gomod
     directory: "/xrayaws-v2"
     schedule:
