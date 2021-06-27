@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 	"sync"
@@ -357,4 +358,12 @@ func (attr *dbAttribute) populate(ctx context.Context, query string) {
 	}
 	seg.SetSQL(sqlData)
 	seg.SetNamespace("remote")
+}
+
+// from Go 1.17, the DB.Close method closes the connector field.
+func (c *driverConnector) Close() error {
+	if c, ok := c.Connector.(io.Closer); ok {
+		return c.Close()
+	}
+	return nil
 }
