@@ -3,7 +3,7 @@ module github.com/shogo82148/aws-xray-yasdk-go/xrayaws
 go 1.13
 
 require (
-	github.com/aws/aws-sdk-go v1.38.68
+	github.com/aws/aws-sdk-go v1.39.0
 	github.com/google/go-cmp v0.5.6
 	github.com/shogo82148/aws-xray-yasdk-go v1.2.3
 )
