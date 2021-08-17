@@ -1,8 +1,7 @@
-github.com/aws/aws-sdk-go v1.40.0 h1:nTCSQAeahNt15SOYxuDwJ8XvMhOU3Uqe7eJUPv7+Vsk=
-github.com/aws/aws-sdk-go v1.40.0/go.mod h1:585smgzpB/KqRA+K3y/NL/oYRqQvpNJYvLm+LY1U59Q=
+github.com/aws/aws-sdk-go v1.40.23 h1:o0cw9jVlbXkDd3eZU7MDIXp3a8zhECnl0BfUs2WNBIM=
+github.com/aws/aws-sdk-go v1.40.23/go.mod h1:585smgzpB/KqRA+K3y/NL/oYRqQvpNJYvLm+LY1U59Q=
 github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/google/go-cmp v0.5.6 h1:BKbKCqvP6I+rmFHt06ZmyQtvB8xAkWdhFyr0ZUNZcxQ=
 github.com/google/go-cmp v0.5.6/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
 github.com/jmespath/go-jmespath v0.4.0 h1:BEgLn5cpjn8UN1mAw4NjwDrS35OdebyEtFe+9YPoQUg=
@@ -12,8 +11,8 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfC
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/shogo82148/aws-xray-yasdk-go v1.2.3 h1:9im/aLY8+LLFd1uNzZwsPkOpUEIcxlqBxwzsqkqyYS4=
-github.com/shogo82148/aws-xray-yasdk-go v1.2.3/go.mod h1:t624hyPDr1jQ8oyReukavabRjLycol2KiToWBtdcfu8=
+github.com/shogo82148/aws-xray-yasdk-go v1.3.0 h1:C5yPsyDc6gwaS3xSpA5JOPKAZ0DkKlkQHMsKGt8jnOk=
+github.com/shogo82148/aws-xray-yasdk-go v1.3.0/go.mod h1:xRNgIaf8uXovXSzaATMQuvQejiRbFq/AB7CmvvAfSMQ=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 golang.org/x/net v0.0.0-20210614182718-04defd469f4e/go.mod h1:9nx3DQGgdP8bBQD5qxJ1jj9UTztislL4KSBs9R2vV5Y=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
