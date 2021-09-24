@@ -43,6 +43,10 @@ xraylog.SetLogger(NewDefaultLogger(os.Stderr, xraylog.LogLevelDebug))
 ### Start a custom segment/subsegment
 
 ```go
+import (
+  "github.com/shogo82148/aws-xray-yasdk-go/xray"
+)
+
 func DoSomethingWithSegment(ctx context.Context) error
   ctx, seg := xray.BeginSegment(ctx, "service-name")
   defer seg.Close()
@@ -61,6 +65,13 @@ func DoSomethingWithSegment(ctx context.Context) error
 ### HTTP Server
 
 ```go
+import (
+  "fmt"
+  "net/http"
+
+  "github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
+)
+
 func main() {
   namer := xrayhttp.FixedTracingNamer("myApp")
   h := xrayhttp.Handler(namer, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +84,13 @@ func main() {
 ### HTTP Client
 
 ```go
+import (
+  "io"
+  "net/http"
+
+  "github.com/shogo82148/aws-xray-yasdk-go/xrayhttp"
+)
+
 func getExample(ctx context.Context) ([]byte, error) {
   req, err := http.NewRequest(http.MethodGet, "http://example.com")
   if err != nil {
@@ -86,22 +104,51 @@ func getExample(ctx context.Context) ([]byte, error) {
       return nil, err
   }
   defer resp.Body.Close()
-  return ioutil.ReadAll(resp.Body)
+  return io.ReadAll(resp.Body)
 }
 ```
 
 ### AWS SDK
 
 ```go
-sess := session.Must(session.NewSession())
-dynamo := dynamodb.New(sess)
-xrayaws.Client(dynamo.Client)
-dynamo.ListTablesWithContext(ctx, &dynamodb.ListTablesInput{})
+import (
+  "github.com/aws/aws-sdk-go/aws/session"
+  "github.com/aws/aws-sdk-go/service/dynamodb"
+  "github.com/shogo82148/aws-xray-yasdk-go/xrayaws"
+)
+
+func listTables() {
+  sess := session.Must(session.NewSession())
+  dynamo := dynamodb.New(sess)
+  xrayaws.Client(dynamo.Client)
+  dynamo.ListTablesWithContext(ctx, &dynamodb.ListTablesInput{})
+}
+```
+
+### AWS SDK v2
+
+```go
+import (
+  "github.com/aws/aws-sdk-go-v2/config"
+  "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+  "github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2"
+)
+
+cfg, err := config.LoadDefaultConfig(ctx, xrayaws.WithXRay())
+if err != nil {
+  panic(err)
+}
+dynamo := dynamodb.NewFromConfig(cfg)
+dynamo.ListTables(ctx, &dynamodb.ListTablesInput{})
 ```
 
 ### SQL
 
 ```go
+import (
+    "github.com/shogo82148/aws-xray-yasdk-go/xraysql"
+)
+
 func main() {
   db, err := xraysql.Open("postgres", "postgres://user:password@host:port/db")
   row, err := db.QueryRowContext(ctx, "SELECT 1")

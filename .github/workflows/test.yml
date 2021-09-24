@@ -67,6 +67,7 @@ jobs:
           - macos-latest
         go:
           - "1"
+          - "1.17"
           - "1.16"
           - "1.15"
           # The v2 SDK requires a minimum version of Go 1.15.
