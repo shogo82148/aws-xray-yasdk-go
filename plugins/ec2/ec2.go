@@ -234,9 +234,24 @@ func Init() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	disabled := os.Getenv("AWS_EC2_METADATA_DISABLED")
+	if strings.EqualFold(disabled, "true") {
+		xraylog.Debugf(ctx, "plugin/ec2: imds is disabled by the environment value")
+		return
+	}
+
 	base := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
 	if base == "" {
-		base = "http://169.254.169.254"
+		mode := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE")
+		switch {
+		case mode == "" || strings.EqualFold(mode, "IPv4"):
+			base = "http://169.254.169.254"
+		case strings.EqualFold(mode, "IPv6"):
+			base = "http://[fd00:ec2::254]"
+		default:
+			xraylog.Debugf(ctx, "plugin/ec2: unknown aws ec2 metadata service endpoint mode: %q", mode)
+			return
+		}
 	}
 	base = strings.TrimSuffix(base, "/")
 	c := &client{
