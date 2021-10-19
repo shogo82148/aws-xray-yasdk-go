@@ -170,7 +170,7 @@ func (conn *driverConn) Query(query string, args []driver.Value) (driver.Rows, e
 func (conn *driverConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	queryer, ok := conn.Conn.(driver.Queryer)
 	queryerCtx, okCtx := conn.Conn.(driver.QueryerContext)
-	if !ok && okCtx {
+	if !ok && !okCtx {
 		return nil, driver.ErrSkip
 	}
 
