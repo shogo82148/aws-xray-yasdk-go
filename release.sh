@@ -19,7 +19,7 @@ EOF
 git add "$CURRENT/xray/version.go"
 git commit -m "bump up v$MAJOR.$MINOR.$PATCH"
 git tag "v$MAJOR.$MINOR.$PATCH"
-git push "v$MAJOR.$MINOR.$PATCH"
+git push origin "v$MAJOR.$MINOR.$PATCH"
 
 # update xrayaws
 cd "$CURRENT/xrayaws"
