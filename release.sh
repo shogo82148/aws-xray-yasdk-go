@@ -31,6 +31,7 @@ cd "$CURRENT/xrayaws-v2"
 go get "github.com/shogo82148/aws-xray-yasdk-go@v$MAJOR.$MINOR.$PATCH"
 go mod tidy
 
+cd "$CURRENT"
 git add .
 git commit -m "bump aws-xray-yasdk-go v$MAJOR.$MINOR.$PATCH"
 git push origin main
