@@ -181,6 +181,7 @@ func (td *NullDaemon) run() {
 		select {
 		case <-td.ctx.Done():
 			return
+		default:
 		}
 	}
 }
