@@ -3,7 +3,9 @@ package xray
 import (
 	"context"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -138,12 +140,24 @@ type Segment struct {
 
 // NewTraceID generates a string format of random trace ID.
 func NewTraceID() string {
-	var r [12]byte
-	_, err := rand.Read(r[:])
-	if err != nil {
+	var buf [35 + 12]byte // 35: dst, 12: i/o buf
+	buf[0] = '1'
+	buf[1] = '-'
+
+	r := buf[35:]
+	now := nowFunc().Unix()
+	r[0] = byte(now >> 24 & 0xff)
+	r[1] = byte(now >> 16 & 0xff)
+	r[2] = byte(now >> 8 & 0xff)
+	r[3] = byte(now & 0xff)
+	hex.Encode(buf[2:10], r[0:4])
+	buf[10] = '-'
+
+	if _, err := io.ReadFull(rand.Reader, r); err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("1-%08x-%x", nowFunc().Unix(), r)
+	hex.Encode(buf[11:35], r[:])
+	return string(buf[:35])
 }
 
 func withTraceID(ctx context.Context, traceID string) context.Context {
@@ -161,12 +175,12 @@ func ContextTraceID(ctx context.Context) string {
 
 // NewSegmentID generates a string format of segment ID.
 func NewSegmentID() string {
-	var r [8]byte
-	_, err := rand.Read(r[:])
-	if err != nil {
+	var r [16 + 8]byte // 16: dst, 8: i/o buf
+	if _, err := io.ReadFull(rand.Reader, r[16:]); err != nil {
 		panic(err)
 	}
-	return fmt.Sprintf("%x", r)
+	hex.Encode(r[:16], r[16:])
+	return string(r[:16])
 }
 
 // ContextSegment return the segment of current context.
