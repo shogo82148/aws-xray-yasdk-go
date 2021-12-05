@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -31,11 +32,23 @@ func TestNewTraceID(t *testing.T) {
 	}
 }
 
+func BenchmarkNewTraceID(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		runtime.KeepAlive(NewTraceID())
+	}
+}
+
 func TestNewSegmentID(t *testing.T) {
 	id := NewSegmentID()
 	pattern := `^[0-9a-fA-F]{16}$`
 	if matched, err := regexp.MatchString(pattern, id); err != nil || !matched {
 		t.Errorf("id should match %q, but got %q", pattern, id)
+	}
+}
+
+func BenchmarkNewSegmentID(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		runtime.KeepAlive(NewSegmentID())
 	}
 }
 
