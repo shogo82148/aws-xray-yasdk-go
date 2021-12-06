@@ -16,6 +16,8 @@ func TestBeginSubsegment_ForLambda(t *testing.T) {
 	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
+	//lint:ignore SA1029 lambdaContextKey should be string because of compatibility with AWS Lambda for Go
+	// ref. https://github.com/aws/aws-lambda-go/blob/14da40f6fad9d5629abe069408b8ec278c36db75/lambda/function.go#L61
 	ctx = context.WithValue(ctx, lambdaContextKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51")
 	ctx, seg := BeginSubsegment(ctx, "subsegment")
 	_ = ctx // do something using ctx
@@ -48,6 +50,8 @@ func TestBeginSubsegment_ForLambda_Nested(t *testing.T) {
 	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
 
+	//lint:ignore SA1029 lambdaContextKey should be string because of compatibility with AWS Lambda for Go
+	// ref. https://github.com/aws/aws-lambda-go/blob/14da40f6fad9d5629abe069408b8ec278c36db75/lambda/function.go#L61
 	ctx = context.WithValue(ctx, lambdaContextKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51")
 	ctx, seg0 := BeginSubsegment(ctx, "subsegment")
 	ctx, seg1 := BeginSubsegment(ctx, "sub-sub-segment")
