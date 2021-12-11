@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -153,7 +152,7 @@ func NewTraceID() string {
 	hex.Encode(buf[2:10], r[0:4])
 	buf[10] = '-'
 
-	if _, err := io.ReadFull(rand.Reader, r); err != nil {
+	if _, err := rand.Read(r); err != nil {
 		panic(err)
 	}
 	hex.Encode(buf[11:35], r[:])
@@ -176,7 +175,7 @@ func ContextTraceID(ctx context.Context) string {
 // NewSegmentID generates a string format of segment ID.
 func NewSegmentID() string {
 	var r [16 + 8]byte // 16: dst, 8: i/o buf
-	if _, err := io.ReadFull(rand.Reader, r[16:]); err != nil {
+	if _, err := rand.Read(r[16:]); err != nil {
 		panic(err)
 	}
 	hex.Encode(r[:16], r[16:])
