@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/aws/aws-sdk-go-v2 v1.15.0
 	github.com/aws/aws-sdk-go-v2/config v1.15.0
-	github.com/aws/aws-sdk-go-v2/service/lambda v1.19.0
+	github.com/aws/aws-sdk-go-v2/service/lambda v1.20.0
 	github.com/aws/smithy-go v1.11.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.5.7
