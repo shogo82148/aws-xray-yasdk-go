@@ -10,6 +10,6 @@ import (
 type LogErrorStrategy struct{}
 
 // ContextMissing implements Strategy.
-func (*LogErrorStrategy) ContextMissing(ctx context.Context, v interface{}) {
+func (*LogErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	xraylog.Errorf(ctx, "AWS X-Ray context missing: %v", v)
 }

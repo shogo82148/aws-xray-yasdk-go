@@ -212,7 +212,7 @@ func (segs *subsegments) afterComplete(r *request.Request, awsData schema.AWS) {
 }
 
 // contextKey is a value for use with context.WithValue. It's used as
-// a pointer so it fits in an interface{} without allocation.
+// a pointer so it fits in an any without allocation.
 type contextKey struct {
 	name string
 }
@@ -298,7 +298,7 @@ func insertParameter(aws schema.AWS, r *request.Request, list *whitelist.Whiteli
 	}
 }
 
-func getValue(v interface{}, key string) interface{} {
+func getValue(v any, key string) any {
 	v1 := reflect.ValueOf(v)
 	if v1.Kind() == reflect.Ptr {
 		v1 = v1.Elem()
@@ -317,7 +317,7 @@ func getValue(v interface{}, key string) interface{} {
 	return nil
 }
 
-func insertDescriptor(desc *whitelist.Descriptor, aws schema.AWS, v interface{}, key string) {
+func insertDescriptor(desc *whitelist.Descriptor, aws schema.AWS, v any, key string) {
 	renameTo := desc.RenameTo
 	if renameTo == "" {
 		renameTo = key
@@ -332,7 +332,7 @@ func insertDescriptor(desc *whitelist.Descriptor, aws schema.AWS, v interface{},
 		if val.Kind() != reflect.Map {
 			return
 		}
-		keySlice := make([]interface{}, 0, val.Len())
+		keySlice := make([]any, 0, val.Len())
 		for _, key := range val.MapKeys() {
 			keySlice = append(keySlice, key.Interface())
 		}

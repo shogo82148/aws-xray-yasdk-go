@@ -19,7 +19,7 @@ import (
 )
 
 // contextKey is a value for use with context.WithValue. It's used as
-// a pointer so it fits in an interface{} without allocation.
+// a pointer so it fits in an any without allocation.
 type contextKey struct {
 	name string
 }
@@ -135,7 +135,7 @@ func NewDefaultLogger(w io.Writer, minLevel LogLevel) Logger {
 		w:        w,
 		minLevel: minLevel,
 		pool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return new(bytes.Buffer)
 			},
 		},
@@ -174,47 +174,47 @@ func (NullLogger) Log(_ context.Context, _ LogLevel, _ fmt.Stringer) {
 }
 
 // Info outputs info level log message.
-func Info(ctx context.Context, v ...interface{}) {
+func Info(ctx context.Context, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelInfo, printArgs{args: v})
 }
 
 // Infof outputs info level log message.
-func Infof(ctx context.Context, format string, v ...interface{}) {
+func Infof(ctx context.Context, format string, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelInfo, printfArgs{format: format, args: v})
 }
 
 // Debug outputs debug level log message.
-func Debug(ctx context.Context, v ...interface{}) {
+func Debug(ctx context.Context, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelDebug, printArgs{args: v})
 }
 
 // Debugf outputs debug level log message.
-func Debugf(ctx context.Context, format string, v ...interface{}) {
+func Debugf(ctx context.Context, format string, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelDebug, printfArgs{format: format, args: v})
 }
 
 // Warn outputs warn level log message.
-func Warn(ctx context.Context, v ...interface{}) {
+func Warn(ctx context.Context, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelWarn, printArgs{args: v})
 }
 
 // Warnf outputs warn level log message.
-func Warnf(ctx context.Context, format string, v ...interface{}) {
+func Warnf(ctx context.Context, format string, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelWarn, printfArgs{format: format, args: v})
 }
 
 // Error outputs error level log message.
-func Error(ctx context.Context, v ...interface{}) {
+func Error(ctx context.Context, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelError, printArgs{args: v})
 }
 
 // Errorf outputs warn level log message.
-func Errorf(ctx context.Context, format string, v ...interface{}) {
+func Errorf(ctx context.Context, format string, v ...any) {
 	ContextLogger(ctx).Log(ctx, LogLevelError, printfArgs{format: format, args: v})
 }
 
 type printArgs struct {
-	args []interface{}
+	args []any
 }
 
 func (args printArgs) String() string {
@@ -223,7 +223,7 @@ func (args printArgs) String() string {
 
 type printfArgs struct {
 	format string
-	args   []interface{}
+	args   []any
 }
 
 func (args printfArgs) String() string {

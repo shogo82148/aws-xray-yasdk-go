@@ -15,7 +15,7 @@ import (
 )
 
 var xrayData = schema.AWS{
-	"xray": map[string]interface{}{
+	"xray": map[string]any{
 		"sdk_version": Version,
 		"sdk":         Name,
 	},
@@ -233,11 +233,11 @@ func TestBeginSubsegment(t *testing.T) {
 }
 
 func TestBeginSubsegment_contextMissing(t *testing.T) {
-	var ctxMissing interface{}
+	var ctxMissing any
 
 	ctx, td := NewTestDaemon(nil)
 	defer td.Close()
-	td.ContextMissing = func(ctx context.Context, v interface{}) {
+	td.ContextMissing = func(ctx context.Context, v any) {
 		ctxMissing = v
 	}
 
@@ -439,7 +439,7 @@ func TestSegment_AddAnnotation(t *testing.T) {
 		TraceID:   seg.traceID,
 		StartTime: 1000000000,
 		EndTime:   1000000000,
-		Annotations: map[string]interface{}{
+		Annotations: map[string]any{
 			"boolean": true,
 			"int64":   -42.0,
 			"uint64":  42.0,

@@ -155,9 +155,9 @@ func TestClient(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": "tcp",
 											"address": u.Host,
 										},
@@ -280,9 +280,9 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": "tcp",
 											"address": u.Host,
 										},
@@ -404,9 +404,9 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": "tcp",
 											"address": u.Host,
 										},
@@ -533,9 +533,9 @@ func TestClient_TLS(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": "tcp",
 											"address": u.Host,
 										},
@@ -547,9 +547,9 @@ func TestClient_TLS(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"tls": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"tls": map[string]any{
 											"version":                       "tls1.2",
 											"negotiated_protocol_is_mutual": true,
 											"cipher_suite":                  "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
@@ -641,8 +641,8 @@ func TestClient_DNS(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	dns := map[string]interface{}{
-		"addresses": []interface{}{addr},
+	dns := map[string]any{
+		"addresses": []any{addr},
 		"coalesced": false,
 	}
 	want := &schema.Segment{
@@ -680,8 +680,8 @@ func TestClient_DNS(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
 										"dns": dns,
 									},
 								},
@@ -691,9 +691,9 @@ func TestClient_DNS(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": network,
 											"address": net.JoinHostPort(addr, u.Port()),
 										},
@@ -720,7 +720,7 @@ func TestClient_DNS(t *testing.T) {
 		Service: xray.ServiceData,
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
-		dns["addresses"] = []interface{}{"::1", addr} // addresses may contains IPv6
+		dns["addresses"] = []any{"::1", addr} // addresses may contains IPv6
 		if diff2 := cmp.Diff(want, got, ignoreVariableField); diff2 != "" {
 			t.Errorf("mismatch (-want +got):\n%s", diff)
 		}
@@ -822,10 +822,10 @@ func TestClient_InvalidDomain(t *testing.T) {
 										},
 									},
 								},
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dns": map[string]interface{}{
-											"addresses": []interface{}{},
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dns": map[string]any{
+											"addresses": []any{},
 											"coalesced": false,
 										},
 									},
@@ -940,9 +940,9 @@ func TestClient_InvalidAddress(t *testing.T) {
 										},
 									},
 								},
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"address": "127.0.0.1:70",
 											"network": "tcp",
 										},
@@ -1055,9 +1055,9 @@ func TestClient_InvalidCertificate(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"address": u.Host,
 											"network": "tcp",
 										},
@@ -1199,9 +1199,9 @@ func TestClient_FailToReadResponse(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": l.Addr().Network(),
 											"address": l.Addr().String(),
 										},
@@ -1314,9 +1314,9 @@ func TestClient_UnexpectedEOF(t *testing.T) {
 								ID:        "xxxxxxxxxxxxxxxx",
 								StartTime: timeFilled,
 								EndTime:   timeFilled,
-								Metadata: map[string]interface{}{
-									"http": map[string]interface{}{
-										"dial": map[string]interface{}{
+								Metadata: map[string]any{
+									"http": map[string]any{
+										"dial": map[string]any{
 											"network": "tcp",
 											"address": u.Host,
 										},

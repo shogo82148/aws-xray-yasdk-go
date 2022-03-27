@@ -21,7 +21,7 @@ import (
 type TestDaemon struct {
 	// ContextMissing is callback function for the context missing strategy.
 	// If it is nil, ignore context missing errors.
-	ContextMissing func(ctx context.Context, v interface{})
+	ContextMissing func(ctx context.Context, v any)
 
 	ch        <-chan *result
 	conn      net.PacketConn
@@ -71,7 +71,7 @@ type testDaemonContextMissing struct {
 	td *TestDaemon
 }
 
-func (s *testDaemonContextMissing) ContextMissing(ctx context.Context, v interface{}) {
+func (s *testDaemonContextMissing) ContextMissing(ctx context.Context, v any) {
 	if s != nil && s.td != nil && s.td.ContextMissing != nil {
 		s.td.ContextMissing(ctx, v)
 	}

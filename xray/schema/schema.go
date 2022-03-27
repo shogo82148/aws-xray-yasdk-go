@@ -80,10 +80,10 @@ type Segment struct {
 	Cause *Cause `json:"cause,omitempty"`
 
 	// annotations object with key-value pairs that you want X-Ray to index for search.
-	Annotations map[string]interface{} `json:"annotations,omitempty"`
+	Annotations map[string]any `json:"annotations,omitempty"`
 
 	// metadata object with any additional data that you want to store in the segment.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 
 	// array of subsegment objects.
 	Subsegments []*Segment `json:"subsegments,omitempty"`
@@ -146,15 +146,15 @@ type HTTPResponse struct {
 }
 
 // AWS is information about the AWS resource on which your application served the request.
-type AWS map[string]interface{}
+type AWS map[string]any
 
 // Set set the value.
-func (aws AWS) Set(key string, value interface{}) {
+func (aws AWS) Set(key string, value any) {
 	aws[toSnakeCase(key)] = value
 }
 
 // Get returns the value named the key.
-func (aws AWS) Get(key string) interface{} {
+func (aws AWS) Get(key string) any {
 	if aws == nil {
 		return nil
 	}

@@ -8,7 +8,7 @@ import (
 var _ Strategy = (*RuntimeErrorStrategy)(nil)
 
 func TestRuntimeError(t *testing.T) {
-	var v interface{}
+	var v any
 	func() {
 		defer func() {
 			v = recover()
