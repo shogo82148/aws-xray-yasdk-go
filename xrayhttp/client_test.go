@@ -1038,7 +1038,7 @@ func TestClient_InvalidCertificate(t *testing.T) {
 						{
 							ID:      "xxxxxxxxxxxxxxxx",
 							Message: urlErr.Err.Error(),
-							Type:    "x509.UnknownAuthorityError",
+							Type:    fmt.Sprintf("%T", urlErr.Err),
 						},
 					},
 				},
@@ -1076,7 +1076,7 @@ func TestClient_InvalidCertificate(t *testing.T) {
 										{
 											ID:      "xxxxxxxxxxxxxxxx",
 											Message: urlErr.Err.Error(),
-											Type:    "x509.UnknownAuthorityError",
+											Type:    fmt.Sprintf("%T", urlErr.Err),
 										},
 									},
 								},
@@ -1183,7 +1183,7 @@ func TestClient_FailToReadResponse(t *testing.T) {
 						{
 							ID:      "xxxxxxxxxxxxxxxx",
 							Message: urlErr.Err.Error(),
-							Type:    "*errors.errorString",
+							Type:    fmt.Sprintf("%T", urlErr.Err),
 						},
 					},
 				},
