@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 package main
@@ -17,7 +18,7 @@ type Generator struct {
 	buf bytes.Buffer
 }
 
-func (g *Generator) Printf(s string, args ...interface{}) {
+func (g *Generator) Printf(s string, args ...any) {
 	fmt.Fprintf(&g.buf, s, args...)
 }
 

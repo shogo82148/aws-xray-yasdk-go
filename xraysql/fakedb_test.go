@@ -24,7 +24,7 @@ func AddOption(opt *FakeConnOption) (dsn string) {
 	return name
 }
 
-type FakeExpect interface{}
+type FakeExpect any
 
 type ExpectQuery struct {
 	Query   string
@@ -115,7 +115,7 @@ var _ driver.Result = &fakeResult{}
 var _ driver.Rows = &fakeRows{}
 
 // printf write the params to the log.
-func (db *fakeDB) printf(format string, params ...interface{}) {
+func (db *fakeDB) printf(format string, params ...any) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	db.log = append(db.log, fmt.Sprintf(format, params...))
@@ -130,7 +130,7 @@ func (db *fakeDB) Log() []string {
 
 // fetch next expected action.
 // v should be a pointer.
-func (db *fakeDB) fetchExpected(v interface{}) error {
+func (db *fakeDB) fetchExpected(v any) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 

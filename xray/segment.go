@@ -21,7 +21,7 @@ import (
 var nowFunc func() time.Time = time.Now
 
 // contextKey is a value for use with context.WithValue. It's used as
-// a pointer so it fits in an interface{} without allocation.
+// a pointer so it fits in an any without allocation.
 type contextKey struct {
 	name string
 }
@@ -130,8 +130,8 @@ type Segment struct {
 	namespace   string
 	user        string
 	origin      string
-	metadata    map[string]interface{}
-	annotations map[string]interface{}
+	metadata    map[string]any
+	annotations map[string]any
 	sql         *schema.SQL
 	http        *schema.HTTP
 	aws         schema.AWS
@@ -357,7 +357,7 @@ func (seg *Segment) Sampled() bool {
 }
 
 type errorPanic struct {
-	err interface{}
+	err any
 }
 
 func (err *errorPanic) Error() string {
@@ -464,7 +464,7 @@ func AddError(ctx context.Context, err error) bool {
 }
 
 // AddPanic adds the information about panic.
-func (seg *Segment) AddPanic(err interface{}) bool {
+func (seg *Segment) AddPanic(err any) bool {
 	if seg == nil {
 		return err != nil
 	}
@@ -476,7 +476,7 @@ func (seg *Segment) AddPanic(err interface{}) bool {
 }
 
 // AddPanic is the shorthand of ContextSegment(ctx).AddPanic(err).
-func AddPanic(ctx context.Context, err interface{}) bool {
+func AddPanic(ctx context.Context, err any) bool {
 	return ContextSegment(ctx).AddPanic(err)
 }
 
@@ -576,35 +576,35 @@ func (seg *Segment) Namespace() string {
 }
 
 // AddMetadata adds metadata.
-func (seg *Segment) AddMetadata(key string, value interface{}) {
+func (seg *Segment) AddMetadata(key string, value any) {
 	seg.AddMetadataToNamespace("default", key, value)
 }
 
 // AddMetadata adds metadata.
-func AddMetadata(ctx context.Context, key string, value interface{}) {
+func AddMetadata(ctx context.Context, key string, value any) {
 	ContextSegment(ctx).AddMetadataToNamespace("default", key, value)
 }
 
 // AddMetadataToNamespace adds metadata.
-func (seg *Segment) AddMetadataToNamespace(namespace, key string, value interface{}) {
+func (seg *Segment) AddMetadataToNamespace(namespace, key string, value any) {
 	if seg == nil {
 		return
 	}
 	seg.mu.Lock()
 	defer seg.mu.Unlock()
 	if seg.metadata == nil {
-		seg.metadata = map[string]interface{}{}
+		seg.metadata = map[string]any{}
 	}
 	if seg.metadata[namespace] == nil {
-		seg.metadata[namespace] = map[string]interface{}{}
+		seg.metadata[namespace] = map[string]any{}
 	}
-	if ns, ok := seg.metadata[namespace].(map[string]interface{}); ok {
+	if ns, ok := seg.metadata[namespace].(map[string]any); ok {
 		ns[key] = value
 	}
 }
 
 // AddMetadataToNamespace adds metadata.
-func AddMetadataToNamespace(ctx context.Context, namespace, key string, value interface{}) {
+func AddMetadataToNamespace(ctx context.Context, namespace, key string, value any) {
 	ContextSegment(ctx).AddMetadata(key, value)
 }
 
@@ -694,14 +694,14 @@ func SetUser(ctx context.Context, user string) {
 	ContextSegment(ctx).SetUser(user)
 }
 
-func (seg *Segment) addAnnotation(key string, value interface{}) {
+func (seg *Segment) addAnnotation(key string, value any) {
 	if seg == nil {
 		return
 	}
 	seg.mu.Lock()
 	defer seg.mu.Unlock()
 	if seg.annotations == nil {
-		seg.annotations = make(map[string]interface{})
+		seg.annotations = make(map[string]any)
 	}
 	seg.annotations[key] = value
 }

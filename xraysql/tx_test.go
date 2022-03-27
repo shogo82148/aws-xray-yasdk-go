@@ -93,9 +93,9 @@ func TestTx_Commit(t *testing.T) {
 				ID:        "xxxxxxxxxxxxxxxx",
 				StartTime: timeFilled,
 				EndTime:   timeFilled,
-				Metadata: map[string]interface{}{
-					"sql": map[string]interface{}{
-						"tx_options": map[string]interface{}{
+				Metadata: map[string]any{
+					"sql": map[string]any{
+						"tx_options": map[string]any{
 							"isolation_level": "Default",
 							"read_only":       false,
 						},
@@ -235,9 +235,9 @@ func TestTx_Rollback(t *testing.T) {
 				ID:        "xxxxxxxxxxxxxxxx",
 				StartTime: timeFilled,
 				EndTime:   timeFilled,
-				Metadata: map[string]interface{}{
-					"sql": map[string]interface{}{
-						"tx_options": map[string]interface{}{
+				Metadata: map[string]any{
+					"sql": map[string]any{
+						"tx_options": map[string]any{
 							"isolation_level": "Default",
 							"read_only":       false,
 						},

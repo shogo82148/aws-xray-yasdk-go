@@ -171,7 +171,7 @@ func parseAgentConfig(ctx context.Context, path string) []*schema.LogReference {
 	}
 	defer f.Close()
 
-	var v interface{}
+	var v any
 	dec := json.NewDecoder(f)
 	if err := dec.Decode(&v); err != nil {
 		xraylog.Debugf(ctx, "plugin/ec2: fail to parse configure file: %v", err)
@@ -193,9 +193,9 @@ type jsonWalker struct {
 	logs []string
 }
 
-func (w *jsonWalker) Walk(v interface{}) {
+func (w *jsonWalker) Walk(v any) {
 	switch v := v.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		for key, value := range v {
 			if key == "log_group_name" {
 				// collect all { "log_group_name": "string value" }
@@ -206,7 +206,7 @@ func (w *jsonWalker) Walk(v interface{}) {
 			}
 			w.Walk(value)
 		}
-	case []interface{}:
+	case []any:
 		for _, value := range v {
 			w.Walk(value)
 		}

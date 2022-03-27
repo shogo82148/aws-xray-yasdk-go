@@ -163,9 +163,9 @@ func TestClient(t *testing.T) {
 										ID:        "xxxxxxxxxxxxxxxx",
 										StartTime: timeFilled,
 										EndTime:   timeFilled,
-										Metadata: map[string]interface{}{
-											"http": map[string]interface{}{
-												"dial": map[string]interface{}{
+										Metadata: map[string]any{
+											"http": map[string]any{
+												"dial": map[string]any{
 													"network": "tcp",
 													"address": u.Host,
 												},
@@ -316,9 +316,9 @@ func TestClient_FailDial(t *testing.T) {
 												},
 											},
 										},
-										Metadata: map[string]interface{}{
-											"http": map[string]interface{}{
-												"dial": map[string]interface{}{
+										Metadata: map[string]any{
+											"http": map[string]any{
+												"dial": map[string]any{
 													"network": "tcp",
 													"address": "127.0.0.1:70",
 												},
@@ -454,9 +454,9 @@ func TestClient_BadRequest(t *testing.T) {
 										ID:        "xxxxxxxxxxxxxxxx",
 										StartTime: timeFilled,
 										EndTime:   timeFilled,
-										Metadata: map[string]interface{}{
-											"http": map[string]interface{}{
-												"dial": map[string]interface{}{
+										Metadata: map[string]any{
+											"http": map[string]any{
+												"dial": map[string]any{
 													"network": "tcp",
 													"address": u.Host,
 												},
@@ -539,7 +539,7 @@ func TestInsertDescriptor_map(t *testing.T) {
 		Map:     true,
 		GetKeys: true,
 	}, aws, v, "Foo")
-	got := aws.Get("Foo").([]interface{})
+	got := aws.Get("Foo").([]any)
 	if len(got) != 2 {
 		t.Errorf("want 2, got %d", len(got))
 	}

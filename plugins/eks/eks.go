@@ -170,7 +170,7 @@ func clusterName(ctx context.Context, client *http.Client, token string) string 
 
 // call CloseIdleConnections() if the client have the method.
 // for Go 1.11
-func closeIdleConnections(client interface{}) {
+func closeIdleConnections(client any) {
 	type IdleConnectionsCloser interface {
 		CloseIdleConnections()
 	}

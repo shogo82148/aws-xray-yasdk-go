@@ -6,6 +6,6 @@ import "context"
 type RuntimeErrorStrategy struct{}
 
 // ContextMissing implements Strategy.
-func (*RuntimeErrorStrategy) ContextMissing(ctx context.Context, v interface{}) {
+func (*RuntimeErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	panic(v)
 }

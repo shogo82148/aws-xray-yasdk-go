@@ -65,7 +65,7 @@ func (conn *driverConn) Begin() (driver.Tx, error) {
 
 func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	ctx, seg := xray.BeginSubsegment(ctx, "transaction")
-	seg.AddMetadataToNamespace("sql", "tx_options", map[string]interface{}{
+	seg.AddMetadataToNamespace("sql", "tx_options", map[string]any{
 		"isolation_level": sql.IsolationLevel(opts.Isolation).String(),
 		"read_only":       opts.ReadOnly,
 	})
