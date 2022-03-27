@@ -29,7 +29,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Dependencies
         run: go mod download
@@ -78,7 +78,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Dependencies
         run: go mod download
