@@ -1,8 +1,8 @@
 package sampling
 
 import (
-	"time"
 	"sync"
+	"time"
 )
 
 type reservoir struct {
