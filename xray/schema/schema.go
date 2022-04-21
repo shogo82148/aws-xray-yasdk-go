@@ -218,16 +218,25 @@ func (aws AWS) AddLogReferences(logs []*LogReference) {
 
 // ECS is information about an Amazon ECS container.
 type ECS struct {
-	// The container ID of the container running your application.
+	// The hostname of your container.
 	Container string `json:"container,omitempty"`
 
+	// The full container ID of your container.
 	ContainerID string `json:"container_id,omitempty"`
+
+	// The ARN of your container instance.
+	ContainerArn string `json:"container_arn,omitempty"`
 }
 
 // EKS is information about an Amazon EKS container.
 type EKS struct {
+	// The hostname of your EKS pod.
+	Pod string `json:"pod,omitempty"`
+
+	// The EKS cluster name.
 	ClusterName string `json:"cluster_name,omitempty"`
-	Pod         string `json:"pod,omitempty"`
+
+	// The full container ID of your container.
 	ContainerID string `json:"container_id,omitempty"`
 }
 
