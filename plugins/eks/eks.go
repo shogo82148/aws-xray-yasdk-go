@@ -70,7 +70,7 @@ func Init() {
 		},
 	}
 	// we don't reuse the client, so release its resources.
-	defer closeIdleConnections(client)
+	defer client.CloseIdleConnections()
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -166,15 +166,4 @@ func clusterName(ctx context.Context, client *http.Client, token string) string 
 	}
 	xraylog.Debugf(ctx, "cluster name is %s", data.Data.ClusterName)
 	return data.Data.ClusterName
-}
-
-// call CloseIdleConnections() if the client have the method.
-// for Go 1.11
-func closeIdleConnections(client any) {
-	type IdleConnectionsCloser interface {
-		CloseIdleConnections()
-	}
-	if c, ok := client.(IdleConnectionsCloser); ok {
-		c.CloseIdleConnections()
-	}
 }

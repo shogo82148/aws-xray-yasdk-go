@@ -2,9 +2,14 @@ package ecs
 
 import (
 	"bufio"
+	"context"
+	"encoding/json"
+	"net"
+	"net/http"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
@@ -13,7 +18,8 @@ import (
 const cgroupPath = "/proc/self/cgroup"
 
 type plugin struct {
-	ECS *schema.ECS
+	ECS           *schema.ECS
+	logReferences []*schema.LogReference
 }
 
 // Init activates ECS Plugin at runtime.
@@ -21,8 +27,19 @@ func Init() {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	uri := os.Getenv("ECS_CONTAINER_METADATA_URI")
-	if !strings.HasPrefix(uri, "http://") {
+	client := newMetadataFetcher()
+	if client == nil {
+		// not in ECS Container, skip installing the plugin
+		return
+	}
+	// we don't reuse the client, so release its resources.
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	meta, err := client.Fetch(ctx)
+	if err != nil {
 		return
 	}
 	hostname, err := os.Hostname()
@@ -31,9 +48,11 @@ func Init() {
 	}
 	xray.AddPlugin(&plugin{
 		ECS: &schema.ECS{
-			Container:   hostname,
-			ContainerID: containerID(cgroupPath),
+			Container:    hostname,
+			ContainerID:  containerID(cgroupPath),
+			ContainerArn: meta.ContainerARN,
 		},
+		logReferences: meta.LogReferences(),
 	})
 }
 
@@ -43,6 +62,7 @@ func (p *plugin) HandleSegment(seg *xray.Segment, doc *schema.Segment) {
 		doc.AWS = schema.AWS{}
 	}
 	doc.AWS.SetECS(p.ECS)
+	doc.AWS.AddLogReferences(p.logReferences)
 }
 
 // Origin implements Plugin.
@@ -67,4 +87,119 @@ func containerID(cgroup string) string {
 		return ""
 	}
 	return line[len(line)-idLength:]
+}
+
+type containerMetadata struct {
+	ContainerARN string
+	LogDriver    string
+	LogOptions   *logOptions
+
+	// we don't use other fields
+}
+
+type logOptions struct {
+	AWSLogsGroup  string `json:"awslogs-group"`
+	AWSLogsRegion string `json:"awslogs-region"`
+}
+
+func (meta *containerMetadata) AccountID() string {
+	arn := meta.ContainerARN
+
+	// trim "arn:aws:ecs:${AWS::Region}:"
+	for i := 0; i < 4; i++ {
+		idx := strings.IndexByte(arn, ':')
+		if idx < 0 {
+			return ""
+		}
+		arn = arn[idx+1:]
+	}
+
+	idx := strings.IndexByte(arn, ':')
+	if idx < 0 {
+		return ""
+	}
+	return arn[:idx]
+}
+
+func (meta *containerMetadata) LogReferences() []*schema.LogReference {
+	opt := meta.LogOptions
+	if opt == nil || opt.AWSLogsGroup == "" {
+		return nil
+	}
+
+	accountID := meta.AccountID()
+	var arn string
+	if opt.AWSLogsRegion != "" && accountID != "" {
+		arn = "arn:aws:logs:" + opt.AWSLogsRegion + ":" + accountID + ":log-group:" + opt.AWSLogsGroup
+	}
+
+	return []*schema.LogReference{
+		{
+			LogGroup: opt.AWSLogsGroup,
+			ARN:      arn,
+		},
+	}
+}
+
+type metadataFetcher struct {
+	client *http.Client
+	url    string
+}
+
+func newMetadataFetcher() *metadataFetcher {
+	url := os.Getenv("ECS_CONTAINER_METADATA_URI_V4")
+	if url == "" {
+		// fallback to v3 endpoint
+		url = os.Getenv("ECS_CONTAINER_METADATA_URI")
+	}
+	if !strings.HasPrefix(url, "http://") {
+		return nil
+	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			// ignore proxy configure from the environment values
+			Proxy: nil,
+
+			// metadata endpoint is in same network,
+			// so timeout can be shorter.
+			DialContext: (&net.Dialer{
+				Timeout:   time.Second,
+				KeepAlive: time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          5,
+			IdleConnTimeout:       time.Second,
+			TLSHandshakeTimeout:   time.Second,
+			ExpectContinueTimeout: time.Second,
+		},
+		Timeout: time.Second,
+	}
+	return &metadataFetcher{
+		client: client,
+		url:    url,
+	}
+}
+
+func (c *metadataFetcher) Fetch(ctx context.Context) (*containerMetadata, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var data containerMetadata
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&data); err != nil {
+		return nil, err
+	}
+	return &data, nil
+}
+
+func (c *metadataFetcher) Close() {
+	c.client.CloseIdleConnections()
 }
