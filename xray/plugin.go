@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"runtime/debug"
 	"sync"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
@@ -38,19 +39,23 @@ func getPlugins() []Plugin {
 }
 
 // xrayPlugin injects information about X-Ray YA-SDK.
-type xrayPlugin struct{}
+type xrayPlugin struct {
+	sdkVersion string
+}
 
 func init() {
-	AddPlugin(xrayPlugin{})
+	AddPlugin(&xrayPlugin{
+		sdkVersion: getVersion(),
+	})
 }
 
 // HandleSegment implements Plugin.
-func (xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
+func (p *xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 	if doc.AWS == nil {
 		doc.AWS = schema.AWS{}
 	}
 	doc.AWS.SetXRay(&schema.XRay{
-		SDKVersion:       Version,
+		SDKVersion:       p.sdkVersion,
 		SDK:              Name,
 		SamplingRuleName: seg.ruleName,
 	})
@@ -58,3 +63,16 @@ func (xrayPlugin) HandleSegment(seg *Segment, doc *schema.Segment) {
 
 // Origin implements Plugin.
 func (xrayPlugin) Origin() string { return "" }
+
+func getVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return Version
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == "github.com/shogo82148/aws-xray-yasdk-go" {
+			return dep.Version
+		}
+	}
+	return Version
+}
