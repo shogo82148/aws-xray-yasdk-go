@@ -51,22 +51,6 @@ type ec2InstanceIdentityDocument struct {
 	Architecture            string    `json:"architecture"`
 }
 
-var httpClient = &http.Client{
-	Transport: &http.Transport{
-		Proxy: nil, // ignore proxy configure from the environment values
-		DialContext: (&net.Dialer{
-			Timeout:   time.Second,
-			KeepAlive: time.Second,
-			DualStack: true,
-		}).DialContext,
-		MaxIdleConns:          5,
-		IdleConnTimeout:       time.Second,
-		TLSHandshakeTimeout:   time.Second,
-		ExpectContinueTimeout: time.Second,
-	},
-	Timeout: time.Second,
-}
-
 type client struct {
 	// base url for the instance metadata api
 	// typically it is http://169.254.169.254
@@ -77,6 +61,58 @@ type client struct {
 
 	// TTL for token
 	ttl time.Time
+
+	httpClient *http.Client
+}
+
+func newClient(ctx context.Context) *client {
+	disabled := os.Getenv("AWS_EC2_METADATA_DISABLED")
+	if strings.EqualFold(disabled, "true") {
+		xraylog.Debugf(ctx, "plugin/ec2: imds is disabled by the environment value")
+		return nil
+	}
+
+	base := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+	if base == "" {
+		mode := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE")
+		switch {
+		case mode == "" || strings.EqualFold(mode, "IPv4"):
+			base = "http://169.254.169.254"
+		case strings.EqualFold(mode, "IPv6"):
+			base = "http://[fd00:ec2::254]"
+		default:
+			xraylog.Debugf(ctx, "plugin/ec2: unknown aws ec2 metadata service endpoint mode: %q", mode)
+			return nil
+		}
+	}
+	base = strings.TrimSuffix(base, "/")
+	c := &client{
+		base: base,
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				// ignore proxy configure from the environment values
+				Proxy: nil,
+
+				// metadata endpoint is in same network,
+				// so timeout can be shorter.
+				DialContext: (&net.Dialer{
+					Timeout:   time.Second,
+					KeepAlive: time.Second,
+					DualStack: true,
+				}).DialContext,
+				MaxIdleConns:          5,
+				IdleConnTimeout:       time.Second,
+				TLSHandshakeTimeout:   time.Second,
+				ExpectContinueTimeout: time.Second,
+			},
+			Timeout: time.Second,
+		},
+	}
+	return c
+}
+
+func (c *client) Close() {
+	c.httpClient.CloseIdleConnections()
 }
 
 func (c *client) refreshToken(ctx context.Context) error {
@@ -86,13 +122,12 @@ func (c *client) refreshToken(ctx context.Context) error {
 		return nil
 	}
 
-	req, err := http.NewRequest(http.MethodPut, c.base+"/latest/api/token", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.base+"/latest/api/token", nil)
 	if err != nil {
 		return err
 	}
-	req = req.WithContext(ctx)
 	req.Header.Set("x-aws-ec2-metadata-token-ttl-seconds", "10")
-	resp, err := httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -118,15 +153,14 @@ func (c *client) getInstanceIdentityDocument(ctx context.Context) (*ec2InstanceI
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, c.base+"/latest/dynamic/instance-identity/document", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/latest/dynamic/instance-identity/document", nil)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 	if c.token != "" {
 		req.Header.Set("x-aws-ec2-metadata-token", c.token)
 	}
-	resp, err := httpClient.Do(req)
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -234,29 +268,12 @@ func Init() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
-	disabled := os.Getenv("AWS_EC2_METADATA_DISABLED")
-	if strings.EqualFold(disabled, "true") {
-		xraylog.Debugf(ctx, "plugin/ec2: imds is disabled by the environment value")
+	c := newClient(ctx)
+	if c == nil {
 		return
 	}
+	defer c.Close()
 
-	base := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
-	if base == "" {
-		mode := os.Getenv("AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE")
-		switch {
-		case mode == "" || strings.EqualFold(mode, "IPv4"):
-			base = "http://169.254.169.254"
-		case strings.EqualFold(mode, "IPv6"):
-			base = "http://[fd00:ec2::254]"
-		default:
-			xraylog.Debugf(ctx, "plugin/ec2: unknown aws ec2 metadata service endpoint mode: %q", mode)
-			return
-		}
-	}
-	base = strings.TrimSuffix(base, "/")
-	c := &client{
-		base: base,
-	}
 	doc, err := c.getInstanceIdentityDocument(ctx)
 	if err != nil {
 		xraylog.Debugf(ctx, "plugin/ec2: failed to get identity document: %v", err)

@@ -51,7 +51,8 @@ func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
 	defer ts.Close()
 
 	c := &client{
-		base: ts.URL,
+		base:       ts.URL,
+		httpClient: &http.Client{},
 	}
 	got, err := c.getInstanceIdentityDocument(context.Background())
 	if err != nil {
@@ -123,7 +124,8 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 	defer ts.Close()
 
 	c := &client{
-		base: ts.URL,
+		base:       ts.URL,
+		httpClient: &http.Client{},
 	}
 	got, err := c.getInstanceIdentityDocument(context.Background())
 	if err != nil {
