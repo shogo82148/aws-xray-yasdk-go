@@ -33,8 +33,8 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1 h1:shLQSRRSCCPj3f2gpwzGw
 github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfCI6z80xFu9LTZmf1ZRjMHUOPmWr69U=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/shogo82148/aws-xray-yasdk-go v1.4.3 h1:3La/K/ahgvPYLZHnUmMg6UImPZYfEKGeZhP9+WMwIJ8=
-github.com/shogo82148/aws-xray-yasdk-go v1.4.3/go.mod h1:xRNgIaf8uXovXSzaATMQuvQejiRbFq/AB7CmvvAfSMQ=
+github.com/shogo82148/aws-xray-yasdk-go v1.5.0 h1:duqFxez+jRHRV5p83ZAdDUrXORXA2xZMQd5MDKQMOuo=
+github.com/shogo82148/aws-xray-yasdk-go v1.5.0/go.mod h1:Bm0kmPLtYUWUAo9jmTnAhdz4wKY5xlO+ZHZTGpKwLJo=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
 golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 h1:go1bK/D/BFZV2I8cIQd1NKEZ+0owSTG1fDTci4IqFcE=
