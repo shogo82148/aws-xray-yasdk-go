@@ -1,7 +1,9 @@
 package xray
 
 import (
+	"reflect"
 	"runtime/debug"
+	"strings"
 	"sync"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
@@ -38,6 +40,8 @@ func getPlugins() []Plugin {
 	return plugins
 }
 
+var _ Plugin = (*xrayPlugin)(nil)
+
 // xrayPlugin injects information about X-Ray YA-SDK.
 type xrayPlugin struct {
 	sdkVersion string
@@ -69,10 +73,19 @@ func getVersion() string {
 	if !ok {
 		return Version
 	}
+
+	// get the package path of the sdk
+	typ := reflect.TypeOf(xrayPlugin{})
+	pkg := typ.PkgPath()
+
+	version := Version
+	depth := 0
 	for _, dep := range info.Deps {
-		if dep.Path == "github.com/shogo82148/aws-xray-yasdk-go" {
-			return dep.Version
+		// search the most specific module
+		if strings.HasPrefix(pkg, dep.Path) && len(dep.Path) > depth {
+			version = dep.Version
+			depth = len(dep.Path)
 		}
 	}
-	return Version
+	return version
 }
