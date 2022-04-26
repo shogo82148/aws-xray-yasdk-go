@@ -6,6 +6,12 @@ import (
 )
 
 func TestAddPlugin(t *testing.T) {
+	org := getPlugins()
+	defer func() {
+		muPlugins.Lock()
+		defer muPlugins.Unlock()
+		plugins = org
+	}()
 	before := len(getPlugins())
 
 	// test of races
@@ -13,11 +19,15 @@ func TestAddPlugin(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(n)
 	for i := 0; i < n; i++ {
-		go AddPlugin(&xrayPlugin{
-			sdkVersion: getVersion(),
-		})
-		go getPlugins()
+		go func() {
+			defer wg.Done()
+			AddPlugin(&xrayPlugin{
+				sdkVersion: getVersion(),
+			})
+			getPlugins()
+		}()
 	}
+	wg.Wait()
 
 	after := len(getPlugins())
 
