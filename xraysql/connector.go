@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -172,21 +174,7 @@ func newDBAttribute(ctx context.Context, driverName string, d driver.Driver, con
 		}
 	}
 
-	// There's no standard to get SQL driver version information
-	// So we invent an interface by which drivers can provide us this data
-	type versionedDriver interface {
-		Version() string
-	}
-
-	if vd, ok := d.(versionedDriver); ok {
-		attr.driverVersion = vd.Version()
-	} else {
-		t := reflect.TypeOf(d)
-		for t.Kind() == reflect.Ptr {
-			t = t.Elem()
-		}
-		attr.driverVersion = t.PkgPath()
-	}
+	attr.driverVersion = getDriverVersion(d)
 	if driverName != "" {
 		attr.name = attr.dbname + "@" + driverName
 	} else {
@@ -203,6 +191,34 @@ func newDBAttribute(ctx context.Context, driverName string, d driver.Driver, con
 		attr.name = cfg.name
 	}
 	return &attr, nil
+}
+
+func getDriverVersion(d driver.Driver) string {
+	t := reflect.TypeOf(d)
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	pkg := t.PkgPath()
+
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return pkg
+	}
+
+	version := ""
+	depth := 0
+	for _, dep := range info.Deps {
+		// search the most specific module
+		if strings.HasPrefix(pkg, dep.Path) && len(dep.Path) > depth {
+			version = dep.Version
+			depth = len(dep.Path)
+		}
+	}
+
+	if version == "" {
+		return pkg
+	}
+	return pkg + "@" + version
 }
 
 func postgresDetector(ctx context.Context, conn driver.Conn, attr *dbAttribute) error {

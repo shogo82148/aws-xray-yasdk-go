@@ -13,7 +13,9 @@ func TestAddPlugin(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(n)
 	for i := 0; i < n; i++ {
-		go AddPlugin(&xrayPlugin{})
+		go AddPlugin(&xrayPlugin{
+			sdkVersion: getVersion(),
+		})
 		go getPlugins()
 	}
 

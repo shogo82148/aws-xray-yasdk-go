@@ -84,6 +84,7 @@ func getVersion() string {
 		// search the most specific module
 		if strings.HasPrefix(pkg, dep.Path) && len(dep.Path) > depth {
 			version = dep.Version
+			depth = len(dep.Path)
 		}
 	}
 	return version
