@@ -61,7 +61,6 @@ jobs:
   finish:
     needs:
       - test
-      - test-xrayaws-v2
     if: always()
     runs-on: ubuntu-latest
     steps:
