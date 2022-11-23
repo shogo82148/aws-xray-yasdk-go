@@ -167,6 +167,11 @@ func withTraceID(ctx context.Context, traceID string) context.Context {
 func ContextTraceID(ctx context.Context) string {
 	id := ctx.Value(traceIDContextKey)
 	if id == nil {
+		if header := ctx.Value(lambdaContextKey); header != nil {
+			// trace header comes from the AWS Lambda context.
+			h := ParseTraceHeader(header.(string))
+			return h.TraceID
+		}
 		return ""
 	}
 	return id.(string)
