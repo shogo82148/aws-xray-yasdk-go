@@ -332,7 +332,7 @@ func (s *CentralizedStrategy) setManifest(manifest *centralizedManifest) {
 	s.manifest = manifest
 }
 
-// start should be called by `s.startOnce.Do(s.start)``
+// start should be called by `s.startOnce.Do(s.start)“
 func (s *CentralizedStrategy) start() {
 	go s.rulePoller()
 	go s.quotaPoller()
