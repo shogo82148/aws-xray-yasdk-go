@@ -43,6 +43,7 @@ func ParseTraceHeader(s string) TraceHeader {
 	var header TraceHeader
 	s = strings.TrimSpace(s)
 	for _, kv := range strings.Split(s, ";") {
+		kv := strings.TrimSpace(kv)
 		idx := strings.IndexByte(kv, '=')
 		if idx < 0 {
 			// ignore invalid parameter
