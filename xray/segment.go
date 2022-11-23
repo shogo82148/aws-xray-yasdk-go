@@ -71,18 +71,21 @@ func sanitizeSegmentName(name string) string {
 	builder.Grow(len(name))
 	var length int
 	for _, r := range name {
-		if unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsSpace(r) {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ' {
 			builder.WriteRune(r)
 		} else if r <= unicode.MaxASCII && strings.IndexByte(`_.:/%&#=+\-@`, byte(r)) >= 0 {
 			builder.WriteRune(r)
 		} else {
-			// ignore invalid charactors
+			// ignore invalid characters
 			continue
 		}
 		length++
 		if length >= 200 {
 			break
 		}
+	}
+	if builder.Len() == 0 {
+		return "none"
 	}
 	return builder.String()
 }
