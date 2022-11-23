@@ -71,6 +71,26 @@ func TestSanitizeSegmentName(t *testing.T) {
 	}
 }
 
+func TestContextTraceID(t *testing.T) {
+	want := "1-5e645f3e-1dfad076a177c5ccc5de12f5"
+	ctx := withTraceID(context.Background(), want)
+	got := ContextTraceID(ctx)
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestContextTraceID_InLambda(t *testing.T) {
+	want := "1-5e645f3e-1dfad076a177c5ccc5de12f5"
+	//lint:ignore SA1029 lambdaContextKey should be string because of compatibility with AWS Lambda for Go
+	// ref. https://github.com/aws/aws-lambda-go/blob/14da40f6fad9d5629abe069408b8ec278c36db75/lambda/function.go#L61
+	ctx := context.WithValue(context.Background(), lambdaContextKey, "Root=1-5e645f3e-1dfad076a177c5ccc5de12f5;Parent=03babb4ba280be51;Sampled=1;")
+	got := ContextTraceID(ctx)
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestBeginSegment(t *testing.T) {
 	nowFunc = fixedTime
 	defer func() { nowFunc = time.Now }()
