@@ -48,7 +48,7 @@ var DefaultSamplingRule = &Manifest{
 	Rules: []*Rule{},
 }
 
-// DecodeManifest decodes json-encoded minifest file.
+// DecodeManifest decodes json-encoded manifest file.
 func DecodeManifest(r io.Reader) (*Manifest, error) {
 	var manifest Manifest
 	dec := json.NewDecoder(r)
