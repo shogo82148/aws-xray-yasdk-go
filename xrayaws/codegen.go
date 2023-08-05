@@ -7,8 +7,8 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"log"
+	"os"
 	"sort"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xrayaws/whitelist"
@@ -26,7 +26,7 @@ func (g *Generator) WriteFile(name string) error {
 	src, err := g.Format()
 	if err != nil {
 		return fmt.Errorf("format: %s: %s:\n\n%s\n", name, err, g.Bytes())
-	} else if err := ioutil.WriteFile(name, src, 0644); err != nil {
+	} else if err := os.WriteFile(name, src, 0644); err != nil {
 		return err
 	}
 	return nil

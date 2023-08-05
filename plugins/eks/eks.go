@@ -7,7 +7,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -38,14 +37,14 @@ func Init() {
 	if runtime.GOOS != "linux" {
 		return
 	}
-	caCert, err := ioutil.ReadFile(caCertificateFile)
+	caCert, err := os.ReadFile(caCertificateFile)
 	if err != nil {
 		// it seems not to be in kubernetes environment.
 		// just ignore error.
 		xraylog.Debugf(ctx, "failed to read ca.crt: %v", err)
 		return
 	}
-	token, err := ioutil.ReadFile(tokenFile)
+	token, err := os.ReadFile(tokenFile)
 	if err != nil {
 		xraylog.Debugf(ctx, "failed to read token: %v", err)
 		return

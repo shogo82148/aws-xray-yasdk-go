@@ -3,7 +3,7 @@ package xraylog
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 )
@@ -28,7 +28,7 @@ func TestLogger(t *testing.T) {
 }
 
 func BenchmarkLogError(b *testing.B) {
-	logger := NewDefaultLogger(ioutil.Discard, LogLevelWarn)
+	logger := NewDefaultLogger(io.Discard, LogLevelWarn)
 	ctx := WithLogger(context.Background(), logger)
 	for i := 0; i < b.N; i++ {
 		Errorf(ctx, "something wrong: %v", "foobar")
@@ -36,7 +36,7 @@ func BenchmarkLogError(b *testing.B) {
 }
 
 func BenchmarkLogDebug(b *testing.B) {
-	logger := NewDefaultLogger(ioutil.Discard, LogLevelWarn)
+	logger := NewDefaultLogger(io.Discard, LogLevelWarn)
 	ctx := WithLogger(context.Background(), logger)
 	for i := 0; i < b.N; i++ {
 		Debugf(ctx, "something wrong: %v", "foobar")

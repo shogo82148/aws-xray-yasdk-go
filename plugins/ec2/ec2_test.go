@@ -3,10 +3,10 @@ package ec2
 import (
 	"context"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -150,11 +150,11 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 
 func TestParseAgentConfig(t *testing.T) {
 	// prepare configure file for test.
-	tmp, err := ioutil.TempFile("", "*.json")
+	dir := t.TempDir()
+	tmp, err := os.Create(filepath.Join(dir, "config.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tmp.Name())
 	_, err = io.WriteString(tmp, `{`+
 		`"log_group_name": "group1",`+ // top level object
 		`"foo": {`+
