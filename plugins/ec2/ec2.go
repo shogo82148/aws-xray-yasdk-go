@@ -7,20 +7,19 @@
 //
 // To enable this plugin, please import the ec2/init package.
 //
-//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2/init"
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2/init"
 //
 // or if you want to load conditionally at runtime, use Init() function.
 //
-//     import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2"
-//     ec2.Init()
-//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ec2"
+//	ec2.Init()
 package ec2
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -138,7 +137,7 @@ func (c *client) refreshToken(ctx context.Context) error {
 		return nil
 	}
 
-	token, err := ioutil.ReadAll(resp.Body)
+	token, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

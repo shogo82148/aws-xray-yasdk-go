@@ -5,12 +5,12 @@
 //
 // The following is an example for associating a log group named "/your-application/log-group-name".
 //
-//    plugin := cwlogs.New(&cwlogs.Config{
-//      LogReferences: []*schema.LogReference{
-//        { LogGroup: "/your-application/log-group-name" },
-//      },
-//    })
-//    xray.AddPlugin(plugin)
+//	plugin := cwlogs.New(&cwlogs.Config{
+//	  LogReferences: []*schema.LogReference{
+//	    { LogGroup: "/your-application/log-group-name" },
+//	  },
+//	})
+//	xray.AddPlugin(plugin)
 //
 // And then, you need to add X-Ray Trace ID into your log.
 package cwlogs

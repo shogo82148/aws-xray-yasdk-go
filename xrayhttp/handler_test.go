@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -122,7 +121,7 @@ func TestHandler(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("want %d, got %d", http.StatusOK, res.StatusCode)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +200,7 @@ func TestHandler_context_canceled(t *testing.T) {
 	if res.StatusCode != http.StatusInternalServerError {
 		t.Errorf("want %d, got %d", http.StatusInternalServerError, res.StatusCode)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +268,7 @@ func TestHandler_WriteString(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("want %d, got %d", http.StatusOK, res.StatusCode)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +340,7 @@ func TestHandler_ReadFrom(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("want %d, got %d", http.StatusOK, res.StatusCode)
 	}
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

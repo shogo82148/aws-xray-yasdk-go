@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -107,7 +106,7 @@ func TestClient(t *testing.T) {
 			t.Fatal()
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal()
 		}
@@ -230,7 +229,7 @@ func TestClient_StatusTooManyRequests(t *testing.T) {
 			t.Fatal()
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal()
 		}
@@ -355,7 +354,7 @@ func TestClient_StatusInternalServerError(t *testing.T) {
 			t.Fatal()
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal()
 		}
@@ -485,7 +484,7 @@ func TestClient_TLS(t *testing.T) {
 			t.Fatal()
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal()
 		}
@@ -628,7 +627,7 @@ func TestClient_DNS(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1261,7 +1260,7 @@ func TestClient_UnexpectedEOF(t *testing.T) {
 			t.Fatal()
 		}
 		defer resp.Body.Close()
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != io.ErrUnexpectedEOF {
 			t.Fatal(err)
 		}
