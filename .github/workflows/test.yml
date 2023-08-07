@@ -16,12 +16,20 @@ jobs:
           - windows-latest
           - macos-latest
         go:
-          - "1"
+          - "stable"
+          - "1.21.0-rc.4"
           - "1.20"
           - "1.19"
           - "1.18"
           - "1.17"
           - "1.16"
+        goexperiment: [""]
+        include:
+          # test with GOEXPERIMENT=loopvar
+          # https://github.com/golang/go/wiki/LoopvarExperiment
+          - go: "1.21.0-rc.4"
+            os: ubuntu-latest
+            goexperiment: "loopvar"
 
     steps:
       - name: Check out code
@@ -32,16 +40,14 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - name: Install Dependencies
-        run: go mod download
-        shell: bash
-
       - name: Test
         run: |
           make test
           make test-xrayaws
           make test-xrayaws-v2
         shell: bash
+        env:
+          GOEXPERIMENT: ${{ matrix.goexperiment }}
 
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
