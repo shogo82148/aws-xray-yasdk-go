@@ -97,6 +97,19 @@ func TestParseTraceHeader(t *testing.T) {
 				},
 			},
 		},
+		{
+			// Example Tracing header with Lineage
+			s: "Root=1-5759e988-bd862e3fe1be46a994272793;Sampled=1;Lineage=a87bd80c:1|68fd508a:5|c512fbe3:2",
+			want: TraceHeader{
+				TraceID:          "1-5759e988-bd862e3fe1be46a994272793",
+				SamplingDecision: SamplingDecisionSampled,
+				AdditionalData: map[string]string{
+					// Lineage may be appended to the trace header by Lambda and other AWS services
+					// as part of their processing mechanisms, and should not be directly used.
+					"Lineage": "a87bd80c:1|68fd508a:5|c512fbe3:2",
+				},
+			},
+		},
 	}
 	for i, tt := range tc {
 		got := ParseTraceHeader(tt.s)
