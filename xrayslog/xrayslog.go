@@ -26,27 +26,33 @@ func (h *handler) Enabled(ctx context.Context, level slog.Level) bool {
 // Handle implements slog.Handler interface.
 func (h *handler) Handle(ctx context.Context, record slog.Record) error {
 	traceID := xray.ContextTraceID(ctx)
-	if traceID == "" {
-		// there is no trace ID in the context.
-		// we don't need to add trace ID to the log record.
+	if traceID == "" && len(h.groups) == 0 {
+		// no trace ID and no groups. nothing to do.
 		return h.parent.Handle(ctx, record)
 	}
 
-	newRecord := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
-	attrs := make([]any, 0, record.NumAttrs())
-	record.Attrs(func(a slog.Attr) bool {
-		attrs = append(attrs, a)
-		return true
-	})
-	for i := len(h.groups) - 1; i >= 0; i-- {
-		attrs = []any{slog.Group(h.groups[i], attrs...)}
-	}
-	for _, attr := range attrs {
-		newRecord.AddAttrs(attr.(slog.Attr))
+	var newRecord slog.Record
+	if len(h.groups) == 0 {
+		newRecord = record.Clone()
+	} else {
+		newRecord = slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+		attrs := make([]any, 0, record.NumAttrs())
+		record.Attrs(func(a slog.Attr) bool {
+			attrs = append(attrs, a)
+			return true
+		})
+		for i := len(h.groups) - 1; i >= 0; i-- {
+			attrs = []any{slog.Group(h.groups[i], attrs...)}
+		}
+		for _, attr := range attrs {
+			newRecord.AddAttrs(attr.(slog.Attr))
+		}
 	}
 
-	// add trace ID to the log record.
-	newRecord.AddAttrs(slog.String(h.traceIDKey, traceID))
+	if traceID != "" {
+		// add trace ID to the log record.
+		newRecord.AddAttrs(slog.String(h.traceIDKey, traceID))
+	}
 	return h.parent.Handle(ctx, newRecord)
 }
 
