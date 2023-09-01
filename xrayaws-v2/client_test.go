@@ -38,7 +38,7 @@ func ignore(s string) string {
 
 const timeFilled = 1234567890
 
-// we check wheather time is set
+// we check whether time is set
 func ignoreTime(t float64) float64 {
 	if t == 0 {
 		return 0
