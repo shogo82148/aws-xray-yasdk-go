@@ -1,0 +1,33 @@
+name: update
+on:
+  schedule:
+    - cron: "24 15 * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    name: update AWSWhitelist.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: stable
+
+      - name: update for AWS SDK v1
+        run: |
+          ./update-whitelist.sh
+          go generate ./...
+        working-directory: ./xrayaws
+
+      - name: update for AWS SDK v2
+        run: |
+          ./update-whitelist.sh
+          go generate ./...
+        working-directory: ./xrayaws-v2
+
+      - uses: shogo82148/actions-commit-and-create-pr@v1
