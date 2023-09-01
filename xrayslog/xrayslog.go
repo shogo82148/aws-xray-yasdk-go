@@ -1,6 +1,7 @@
 //go:build go1.21
 // +build go1.21
 
+// Package xrayslog provides a [log/slog.Handler] that adds trace ID to the log record.
 package xrayslog
 
 import (
