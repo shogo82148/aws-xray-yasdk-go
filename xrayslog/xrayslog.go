@@ -15,6 +15,7 @@ var _ slog.Handler = (*handler)(nil)
 type handler struct {
 	parent     slog.Handler
 	traceIDKey string
+	groups     []string
 }
 
 // Enable implements slog.Handler interface.
@@ -27,12 +28,24 @@ func (h *handler) Handle(ctx context.Context, record slog.Record) error {
 	traceID := xray.ContextTraceID(ctx)
 	if traceID == "" {
 		// there is no trace ID in the context.
-		// don't add trace ID to the log record.
+		// we don't need to add trace ID to the log record.
 		return h.parent.Handle(ctx, record)
 	}
 
+	newRecord := slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+	attrs := make([]any, 0, record.NumAttrs())
+	record.Attrs(func(a slog.Attr) bool {
+		attrs = append(attrs, a)
+		return true
+	})
+	for i := len(h.groups) - 1; i >= 0; i-- {
+		attrs = []any{slog.Group(h.groups[i], attrs...)}
+	}
+	for _, attr := range attrs {
+		newRecord.AddAttrs(attr.(slog.Attr))
+	}
+
 	// add trace ID to the log record.
-	newRecord := record.Clone()
 	newRecord.AddAttrs(slog.String(h.traceIDKey, traceID))
 	return h.parent.Handle(ctx, newRecord)
 }
@@ -47,10 +60,9 @@ func (h *handler) WithAttrs(attrs []slog.Attr) slog.Handler {
 
 // WithGroup implements slog.Handler interface.
 func (h *handler) WithGroup(name string) slog.Handler {
-	return &handler{
-		parent:     h.parent.WithGroup(name),
-		traceIDKey: h.traceIDKey,
-	}
+	h2 := *h // shallow copy, but it is OK.
+	h2.groups = append(h2.groups, name)
+	return &h2
 }
 
 // NewHandler returns a slog.Handler that adds trace ID to the log record.
