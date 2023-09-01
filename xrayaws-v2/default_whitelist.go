@@ -751,6 +751,11 @@ var defaultWhitelist = &whitelist.Whitelist{
 						"TopicArn",
 					},
 				},
+				"PublishBatch": {
+					RequestParameters: []string{
+						"TopicArn",
+					},
+				},
 			},
 		},
 		"sqs": {
