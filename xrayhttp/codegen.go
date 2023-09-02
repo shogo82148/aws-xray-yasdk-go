@@ -44,7 +44,10 @@ func generate(interfaces []string, path string) {
 
 	package xrayhttp
 
-	import "net/http"
+	import (
+		"io"
+		"net/http"
+	)
 	`)
 
 	g.Printf("func wrap(rw *serverResponseTracer) http.ResponseWriter {\n")
@@ -55,13 +58,13 @@ func generate(interfaces []string, path string) {
 
 	g.Printf("switch n {\n")
 	combinations := 1 << uint(len(interfaces))
-	values := make([]string, len(interfaces)+1)
+	values := make([]string, len(interfaces)+2)
 	for i := range values {
 		values[i] = "rw"
 	}
 	for i := 0; i < combinations; i++ {
 		fields := make([]string, 0, len(interfaces))
-		fields = append(fields, "responseWriter")
+		fields = append(fields, "http.ResponseWriter", "rwUnwrapper")
 		for j, iface := range interfaces {
 			ok := i&(1<<uint(j)) > 0
 			if ok {
@@ -90,5 +93,7 @@ func main() {
 		"http.CloseNotifier",
 		"http.Hijacker",
 		"http.Pusher",
+		"io.ReaderFrom",
+		"io.StringWriter",
 	}, "wrap.go")
 }

@@ -212,6 +212,16 @@ func TestHandler_context_canceled(t *testing.T) {
 	}
 }
 
+type dummyStringWriter struct {
+	http.ResponseWriter
+	called bool
+}
+
+func (rw *dummyStringWriter) WriteString(s string) (int, error) {
+	rw.called = true
+	return rw.ResponseWriter.Write([]byte(s))
+}
+
 func TestHandler_WriteString(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
@@ -225,9 +235,12 @@ func TestHandler_WriteString(t *testing.T) {
 	}))
 
 	rec := httptest.NewRecorder()
+	rw := &dummyStringWriter{
+		ResponseWriter: rec,
+	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req = req.WithContext(ctx)
-	h.ServeHTTP(rec, req)
+	h.ServeHTTP(rw, req)
 
 	got, err := td.Recv()
 	if err != nil {
@@ -263,6 +276,9 @@ func TestHandler_WriteString(t *testing.T) {
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
 	}
+	if !rw.called {
+		t.Error("WriteString is not called")
+	}
 
 	res := rec.Result()
 	if res.StatusCode != http.StatusOK {
@@ -280,6 +296,16 @@ func TestHandler_WriteString(t *testing.T) {
 	}
 }
 
+type dummyReaderFrom struct {
+	http.ResponseWriter
+	called bool
+}
+
+func (rw *dummyReaderFrom) ReadFrom(r io.Reader) (n int64, err error) {
+	rw.called = true
+	return io.Copy(rw.ResponseWriter, r)
+}
+
 func TestHandler_ReadFrom(t *testing.T) {
 	ctx, td := xray.NewTestDaemon(nil)
 	defer td.Close()
@@ -292,14 +318,15 @@ func TestHandler_ReadFrom(t *testing.T) {
 		if _, err := dst.ReadFrom(src); err != nil {
 			panic(err)
 		}
-		f := w.(http.Flusher)
-		f.Flush()
 	}))
 
 	rec := httptest.NewRecorder()
+	rw := &dummyReaderFrom{
+		ResponseWriter: rec,
+	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
 	req = req.WithContext(ctx)
-	h.ServeHTTP(rec, req)
+	h.ServeHTTP(rw, req)
 
 	got, err := td.Recv()
 	if err != nil {
@@ -416,6 +443,90 @@ func TestHandler_Hijack(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+type dummyFlusher struct {
+	http.ResponseWriter
+	called bool
+}
+
+func (rw *dummyFlusher) Flush() {
+	rw.called = true
+}
+
+func TestHandler_Flush(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	h := Handler(FixedTracingNamer("test"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusOK)
+		if _, err := io.WriteString(w, "hello"); err != nil {
+			panic(err)
+		}
+		w.(http.Flusher).Flush()
+	}))
+
+	rec := httptest.NewRecorder()
+	rw := &dummyFlusher{
+		ResponseWriter: rec,
+	}
+	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
+	req = req.WithContext(ctx)
+	h.ServeHTTP(rw, req)
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		HTTP: &schema.HTTP{
+			Request: &schema.HTTPRequest{
+				Method:   http.MethodGet,
+				URL:      "http://example.com",
+				ClientIP: "192.0.2.1",
+			},
+			Response: &schema.HTTPResponse{
+				Status:        http.StatusOK,
+				ContentLength: 5,
+			},
+		},
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "response",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+	if !rw.called {
+		t.Error("Flush is not called")
+	}
+
+	res := rec.Result()
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("want %d, got %d", http.StatusOK, res.StatusCode)
+	}
+	data, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "hello" {
+		t.Errorf("want %s, got %s", "hello", string(data))
+	}
+	if res.Header.Get("Content-Type") != "text/plain" {
+		t.Errorf("want %s, got %s", "text/plain", res.Header.Get("Content-Type"))
 	}
 }
 
