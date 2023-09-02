@@ -462,7 +462,9 @@ func TestHandler_Flush(t *testing.T) {
 	h := Handler(FixedTracingNamer("test"), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusOK)
-		io.WriteString(w, "hello")
+		if _, err := io.WriteString(w, "hello"); err != nil {
+			panic(err)
+		}
 		w.(http.Flusher).Flush()
 	}))
 
