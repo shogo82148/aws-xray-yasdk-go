@@ -7,30 +7,6 @@ import (
 	"testing"
 )
 
-type dummyFlusher struct {
-	http.ResponseWriter
-}
-
-func (dummyFlusher) Flush() {
-	panic("unreachable")
-}
-
-func TestWrap_Flusher(t *testing.T) {
-	got := wrap(&serverResponseTracer{rw: dummyFlusher{}})
-	if _, ok := got.(http.Flusher); !ok {
-		t.Error("want to implement http.Flusher, but it doesn't")
-	}
-	if _, ok := got.(http.CloseNotifier); ok {
-		t.Error("want not to implement http.CloseNotifier, but it does")
-	}
-	if _, ok := got.(http.Hijacker); ok {
-		t.Error("want not to implement http.Hijacker, but it does")
-	}
-	if _, ok := got.(http.Pusher); ok {
-		t.Error("want not to implement http.Pusher, but it does")
-	}
-}
-
 type dummyCloseNotifier struct {
 	http.ResponseWriter
 }

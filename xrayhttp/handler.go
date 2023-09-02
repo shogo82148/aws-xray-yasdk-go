@@ -72,6 +72,7 @@ func HandlerWithClient(tn TracingNamer, client *xray.Client, h http.Handler) htt
 	}
 }
 
+// ServeHTTP implements [net/http.Handler].
 func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	name := tracer.tn.TracingName(r)
 	if name == "" {
@@ -156,10 +157,10 @@ func clientIP(r *http.Request) (string, bool) {
 	return ip, false
 }
 
-type responseWriter interface {
-	http.ResponseWriter
-	io.ReaderFrom
-	io.StringWriter
+type rwUnwrapper interface {
+	// Unwrap returns the original http.ResponseWriter underlying this.
+	// It is used by [net/http.ResponseController].
+	Unwrap() http.ResponseWriter
 }
 
 type serverResponseTracer struct {
@@ -173,10 +174,12 @@ type serverResponseTracer struct {
 	hijacked bool
 }
 
+// Header implements [net/http.ResponseWriter].
 func (rw *serverResponseTracer) Header() http.Header {
 	return rw.rw.Header()
 }
 
+// Write implements [net/http.ResponseWriter].
 func (rw *serverResponseTracer) Write(b []byte) (int, error) {
 	if rw.status == 0 {
 		rw.WriteHeader(http.StatusOK)
@@ -186,6 +189,7 @@ func (rw *serverResponseTracer) Write(b []byte) (int, error) {
 	return size, err
 }
 
+// WriteHeader implements [net/http.ResponseWriter].
 func (rw *serverResponseTracer) WriteHeader(s int) {
 	if rw.respCtx == nil {
 		rw.respCtx, rw.respSeg = xray.BeginSubsegment(rw.ctx, "response")
@@ -194,6 +198,7 @@ func (rw *serverResponseTracer) WriteHeader(s int) {
 	rw.status = s
 }
 
+// Hijack implements [net/http.Hijacker].
 func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h := rw.rw.(http.Hijacker)
 	conn, buf, err := h.Hijack()
@@ -214,46 +219,48 @@ func (rw *serverResponseTracer) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return conn, buf, err
 }
 
+// Flush implements [net/http.Flusher].
 func (rw *serverResponseTracer) Flush() {
-	if f, ok := rw.rw.(http.Flusher); ok {
-		f.Flush()
-	}
+	// we don't check rw.rw actually implements http.Flusher here, because it is done in the wrap func.
+	f := rw.rw.(http.Flusher)
+	f.Flush()
 }
 
+// Push implements [net/http.Pusher].
 func (rw *serverResponseTracer) Push(target string, opts *http.PushOptions) error {
-	if p, ok := rw.rw.(http.Pusher); ok {
-		return p.Push(target, opts)
-	}
-	return http.ErrNotSupported
+	// we don't check rw.rw actually implements http.Pusher here, because it is done in the wrap func.
+	p := rw.rw.(http.Pusher)
+	return p.Push(target, opts)
 }
 
 func (rw *serverResponseTracer) CloseNotify() <-chan bool {
+	// we don't check rw.rw actually implements http.CloseNotifier here, because it is done in the wrap func.
 	n := rw.rw.(http.CloseNotifier)
 	return n.CloseNotify()
 }
 
+// WriteString implements [io.StringWriter].
 func (rw *serverResponseTracer) WriteString(str string) (int, error) {
-	var size int
-	var err error
-	if s, ok := rw.rw.(io.StringWriter); ok {
-		size, err = s.WriteString(str)
-	} else {
-		size, err = rw.rw.Write([]byte(str))
-	}
+	// we don't check rw.rw actually implements io.StringWriter here, because it is done in the wrap func.
+	s := rw.rw.(io.StringWriter)
+	size, err := s.WriteString(str)
 	rw.size += int64(size)
 	return size, err
 }
 
+// ReadFrom implements [io.ReaderFrom].
 func (rw *serverResponseTracer) ReadFrom(src io.Reader) (int64, error) {
-	var size int64
-	var err error
-	if r, ok := rw.rw.(io.ReaderFrom); ok {
-		size, err = r.ReadFrom(src)
-	} else {
-		size, err = io.Copy(rw.rw, src)
-	}
+	// we don't check rw.rw actually implements io.ReaderFrom here, because it is done in the wrap func.
+	r := rw.rw.(io.ReaderFrom)
+	size, err := r.ReadFrom(src)
 	rw.size += size
 	return size, err
+}
+
+// Unwrap returns the original http.ResponseWriter underlying this.
+// It is used by [net/http.ResponseController].
+func (rw *serverResponseTracer) Unwrap() http.ResponseWriter {
+	return rw.rw
 }
 
 func (rw *serverResponseTracer) close() {
