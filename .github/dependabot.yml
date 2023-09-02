@@ -3,13 +3,21 @@
 
 version: 2
 updates:
+  # Maintain dependencies for the X-Ray AWS SDK Go v1
   - package-ecosystem: gomod
     directory: "/xrayaws"
     schedule:
       interval: daily
     ignore:
       - dependency-name: github.com/aws/aws-sdk-go
+        # Since AWS SDK Go v1 is frequently updated and causes noise, only update minor versions
         update-types: ["version-update:semver-patch"]
+    labels:
+      - "xrayaws"
+      - "go"
+      - "dependencies"
+
+  # Maintain dependencies for the X-Ray AWS SDK Go v2
   - package-ecosystem: gomod
     directory: "/xrayaws-v2"
     schedule:
@@ -19,6 +27,12 @@ updates:
         patterns:
           - github.com/aws/aws-sdk-go-v2
           - github.com/aws/aws-sdk-go-v2/*
+    labels:
+      - "xrayaws-v2"
+      - "go"
+      - "dependencies"
+
+  # Other dependencies for Go
   - package-ecosystem: gomod
     directory: "/"
     schedule:
