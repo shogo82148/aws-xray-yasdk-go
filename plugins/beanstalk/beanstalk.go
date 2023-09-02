@@ -1,3 +1,15 @@
+// Package beanstalk provides plugin for AWS Elastic Beanstalk.
+// The plugin collects the information of Elastic Beanstalk environment,
+// and record them.
+//
+// To enable this plugin, please import the beanstalk/init package.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/beanstalk/init"
+//
+// or if you want to load conditionally at runtime, use Init() function.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/beanstalk"
+//	beanstalk.Init()
 package beanstalk
 
 import (
@@ -5,6 +17,7 @@ import (
 	"encoding/json"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -18,8 +31,14 @@ type plugin struct {
 	ElasticBeanstalk *schema.ElasticBeanstalk
 }
 
-// Init activates ECS Plugin at runtime.
+var once sync.Once
+
+// Init activates Beanstalk Plugin at runtime.
 func Init() {
+	once.Do(initBeanstalkPlugin)
+}
+
+func initBeanstalkPlugin() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 

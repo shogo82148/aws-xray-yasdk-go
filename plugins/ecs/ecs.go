@@ -1,3 +1,15 @@
+// Package ecs provides a plugin for Amazon ECS (Amazon Elastic Container Service).
+// The plugin collects the information of ECS containers, and record them.
+// The container ID, the container name and the container ARN are available.
+//
+// To enable this plugin, please import the ecs/init package.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ecs/init"
+//
+// or if you want to load conditionally at runtime, use Init() function.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/ecs"
+//	ecs.Init()
 package ecs
 
 import (
@@ -9,6 +21,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -22,8 +35,14 @@ type plugin struct {
 	logReferences []*schema.LogReference
 }
 
+var once sync.Once
+
 // Init activates ECS Plugin at runtime.
 func Init() {
+	once.Do(initECSPlugin)
+}
+
+func initECSPlugin() {
 	if runtime.GOOS != "linux" {
 		return
 	}

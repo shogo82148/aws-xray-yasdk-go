@@ -1,6 +1,6 @@
-// Package ec2 provides a plugin for Amazon Elastic Compute Cloud.
+// Package ec2 provides a plugin for Amazon EC2 (Amazon Elastic Compute Cloud).
 // The plugin collects the information of EC2 instances, and record them.
-// The instance ID, the availability zone, the instance type, and the AMI ID are available.
+// The instance ID, the availability zone, the instance type and the AMI ID are available.
 //
 // If CloudWatch Agent is installed in the instance, the plugin collects the CloudWatch Logs Groups.
 // It allows you to view the log of a trace using CloudWatch ServiceLens.
@@ -26,6 +26,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -50,6 +51,12 @@ type ec2InstanceIdentityDocument struct {
 	Architecture            string    `json:"architecture"`
 }
 
+// client fetches EC2 metadata.
+// It provides same feature as [ec2metadata] or [ec2imds] package.
+// We don't want to depend on the AWS SDK, so we implement it by ourselves.
+//
+// [ec2metadata]: https://pkg.go.dev/github.com/aws/aws-sdk-go/aws/ec2metadata
+// [ec2imds]: https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/ec2imds
 type client struct {
 	// base url for the instance metadata api
 	// typically it is http://169.254.169.254
@@ -262,8 +269,14 @@ type ec2plugin struct {
 	logReferences []*schema.LogReference
 }
 
+var once sync.Once
+
 // Init activates EC2Plugin at runtime.
 func Init() {
+	once.Do(initEC2Plugin)
+}
+
+func initEC2Plugin() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 

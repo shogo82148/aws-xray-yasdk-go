@@ -1,7 +1,6 @@
 // Package cwlogs provides a plugin for Amazon CloudWatch Logs.
 // The plugin associates segments with log groups,
-// and allows you to view the log of a trace using CloudWatch ServiceLens.
-// https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/servicelens_service_map_traces.html
+// and allows you to view the log of a trace using [CloudWatch ServiceLens].
 //
 // The following is an example for associating a log group named "/your-application/log-group-name".
 //
@@ -13,6 +12,8 @@
 //	xray.AddPlugin(plugin)
 //
 // And then, you need to add X-Ray Trace ID into your log.
+//
+// [CloudWatch ServiceLens]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/servicelens_service_map_traces.html
 package cwlogs
 
 import (
