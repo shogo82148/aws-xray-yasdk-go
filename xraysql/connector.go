@@ -354,7 +354,7 @@ func queryRow(ctx context.Context, conn driver.Conn, query string, dest ...*stri
 		case bool:
 			*d = strconv.FormatBool(s)
 		default:
-			return fmt.Errorf("sql: Scan error on column index %d, name %q: type missmatch", i, rows.Columns()[i])
+			return fmt.Errorf("sql: Scan error on column index %d, name %q: type mismatch", i, rows.Columns()[i])
 		}
 	}
 
