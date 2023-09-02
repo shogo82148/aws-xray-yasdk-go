@@ -4,24 +4,12 @@ import (
 	"context"
 	"database/sql/driver"
 	"errors"
-
-	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
 
 type driverStmt struct {
 	driver.Stmt
 	conn  *driverConn
 	query string
-}
-
-// util function for handling a transaction segment.
-func (stmt *driverStmt) beginSubsegment(ctx context.Context) (context.Context, *xray.Segment) {
-	parent := ctx
-	if stmt.conn.tx != nil {
-		parent = stmt.conn.tx.ctx
-	}
-	_, seg := xray.BeginSubsegment(parent, stmt.conn.attr.name)
-	return xray.WithSegment(ctx, seg), seg
 }
 
 func (stmt *driverStmt) Close() error {
@@ -38,9 +26,10 @@ func (stmt *driverStmt) Exec(args []driver.Value) (driver.Result, error) {
 
 func (stmt *driverStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
 	var result driver.Result
-	ctx, seg := stmt.beginSubsegment(ctx)
-	defer seg.Close()
-	stmt.conn.attr.populate(ctx, stmt.query)
+	ctx, seg := stmt.conn.beginSubsegment(ctx)
+	defer stmt.conn.closeSubsegment()
+	stmt.conn.attr.populateToSegment(seg, stmt.query)
+
 	var err error
 	if execerContext, ok := stmt.Stmt.(driver.StmtExecContext); ok {
 		result, err = execerContext.ExecContext(ctx, args)
@@ -69,9 +58,10 @@ func (stmt *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 func (stmt *driverStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
 	var result driver.Rows
-	ctx, seg := stmt.beginSubsegment(ctx)
-	defer seg.Close()
-	stmt.conn.attr.populate(ctx, stmt.query)
+	ctx, seg := stmt.conn.beginSubsegment(ctx)
+	defer stmt.conn.closeSubsegment()
+	stmt.conn.attr.populateToSegment(seg, stmt.query)
+
 	var err error
 	if queryCtx, ok := stmt.Stmt.(driver.StmtQueryContext); ok {
 		result, err = queryCtx.QueryContext(ctx, args)
