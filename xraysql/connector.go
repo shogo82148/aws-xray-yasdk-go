@@ -361,8 +361,13 @@ func queryRow(ctx context.Context, conn driver.Conn, query string, dest ...*stri
 	return nil
 }
 
+// populate adds SQL data to the current segment.
 func (attr *dbAttribute) populate(ctx context.Context, query string) {
 	seg := xray.ContextSegment(ctx)
+	attr.populateToSegment(seg, query)
+}
+
+func (attr *dbAttribute) populateToSegment(seg *xray.Segment, query string) {
 	sqlData := &schema.SQL{
 		ConnectionString: attr.connectionString,
 		URL:              attr.url,

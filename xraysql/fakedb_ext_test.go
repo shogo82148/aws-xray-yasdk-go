@@ -3,12 +3,15 @@ package xraysql
 import (
 	"database/sql/driver"
 	"fmt"
+	"strings"
 )
 
-// fakeConnExt implements Execer and Queryer
+// fakeConnExt is an implementation of [database/sql/driver.Conn],
+// and it also implements optional interfaces [database/sql/driver.Execer] and [database/sql/driver.Queryer].
 type fakeConnExt fakeConn
 
-// fakeStmtExt implements ColumnConverter
+// fakeStmtExt is an implementation of [database/sql/driver.Stmt],
+// and it also implements optional interface [database/sql/driver.ColumnConverter].
 type fakeStmtExt fakeStmt
 
 var _ driver.Conn = &fakeConnExt{}
@@ -38,6 +41,11 @@ func (c *fakeConnExt) Begin() (driver.Tx, error) {
 }
 
 func (c *fakeConnExt) Exec(query string, args []driver.Value) (driver.Result, error) {
+	if strings.Contains(query, "?") {
+		// the query contains placeholders, so we can't use this fast-path.
+		return nil, driver.ErrSkip
+	}
+
 	c.db.printf("[Conn.Exec] %s %s", query, convertValuesToString(args))
 	var expect *ExpectExec
 	if err := c.db.fetchExpected(&expect); err != nil {
@@ -56,6 +64,11 @@ func (c *fakeConnExt) Exec(query string, args []driver.Value) (driver.Result, er
 }
 
 func (c *fakeConnExt) Query(query string, args []driver.Value) (driver.Rows, error) {
+	if strings.Contains(query, "?") {
+		// the query contains placeholders, so we can't use this fast-path.
+		return nil, driver.ErrSkip
+	}
+
 	c.db.printf("[Conn.Query] %s %s", query, convertValuesToString(args))
 	var expect *ExpectQuery
 	if err := c.db.fetchExpected(&expect); err != nil {

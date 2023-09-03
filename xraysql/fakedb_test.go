@@ -79,7 +79,7 @@ func (d *fakeDriver) Open(name string) (driver.Conn, error) {
 	return connector.Connect(context.Background())
 }
 
-// fakeConn is minimum implementation of driver.Conn
+// fakeConn is minimum implementation of [database/sql/driver.Conn].
 type fakeConn struct {
 	db  *fakeDB
 	opt *FakeConnOption
@@ -91,7 +91,7 @@ type fakeTx struct {
 	opt *FakeConnOption
 }
 
-// fakeStmt is minimum implementation of driver.Stmt
+// fakeStmt is minimum implementation of [database/sql/driver.Stmt].
 type fakeStmt struct {
 	db    *fakeDB
 	query string

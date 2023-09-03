@@ -10,9 +10,17 @@ import (
 )
 
 type driverConn struct {
+	// Conn is the original connection.
 	driver.Conn
+
+	// attr is the attributes of the connection.
 	attr *dbAttribute
-	tx   *driverTx
+
+	// tx is the current transaction.
+	tx *driverTx
+
+	// seg is the segment for the connection.
+	seg *xray.Segment
 }
 
 func (d *driverDriver) Open(dataSourceName string) (driver.Conn, error) {
@@ -110,14 +118,28 @@ func (conn *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (dri
 	return tx1, nil
 }
 
-// util function for handling a transaction segment.
+// beginSubsegment begins a new sub-segment if there is no segment.
 func (conn *driverConn) beginSubsegment(ctx context.Context) (context.Context, *xray.Segment) {
+	if conn.seg != nil {
+		return xray.WithSegment(ctx, conn.seg), conn.seg
+	}
+
 	parent := ctx
 	if conn.tx != nil {
+		// if there is a transaction, use the transaction's segment as the parent.
 		parent = conn.tx.ctx
 	}
 	_, seg := xray.BeginSubsegment(parent, conn.attr.name)
+	conn.seg = seg
 	return xray.WithSegment(ctx, seg), seg
+}
+
+// closeSubsegment closes the current sub-segment.
+func (conn *driverConn) closeSubsegment() {
+	if conn.seg != nil {
+		conn.seg.Close()
+		conn.seg = nil
+	}
 }
 
 func (conn *driverConn) Exec(query string, args []driver.Value) (driver.Result, error) {
@@ -132,7 +154,6 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 	}
 
 	ctx, seg := conn.beginSubsegment(ctx)
-	defer seg.Close()
 
 	var err error
 	var result driver.Result
@@ -144,22 +165,24 @@ func (conn *driverConn) ExecContext(ctx context.Context, query string, args []dr
 		case <-ctx.Done():
 			err := ctx.Err()
 			seg.AddError(err)
+			conn.closeSubsegment()
 			return nil, err
 		}
 		dargs, err0 := namedValuesToValues(args)
 		if err0 != nil {
 			seg.AddError(err0)
+			conn.closeSubsegment()
 			return nil, err0
 		}
 		result, err = execer.Exec(query, dargs)
 	}
 
 	if err == driver.ErrSkip {
-		conn.attr.populate(ctx, query+msgErrSkip)
 		return nil, driver.ErrSkip
 	}
-	conn.attr.populate(ctx, query)
+	conn.attr.populateToSegment(seg, query)
 	seg.AddError(err)
+	conn.closeSubsegment()
 	return result, err
 }
 
@@ -175,7 +198,6 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 	}
 
 	ctx, seg := conn.beginSubsegment(ctx)
-	defer seg.Close()
 
 	var err error
 	var rows driver.Rows
@@ -187,30 +209,34 @@ func (conn *driverConn) QueryContext(ctx context.Context, query string, args []d
 		case <-ctx.Done():
 			err := ctx.Err()
 			seg.AddError(err)
+			conn.closeSubsegment()
 			return nil, err
 		}
 		dargs, err0 := namedValuesToValues(args)
 		if err0 != nil {
 			seg.AddError(err0)
+			conn.closeSubsegment()
 			return nil, err0
 		}
 		rows, err = queryer.Query(query, dargs)
 	}
 
 	if err == driver.ErrSkip {
-		conn.attr.populate(ctx, query+msgErrSkip)
 		return nil, driver.ErrSkip
 	}
 	conn.attr.populate(ctx, query)
 	seg.AddError(err)
+	conn.closeSubsegment()
 	return rows, err
 }
 
 func (conn *driverConn) Close() error {
+	conn.closeSubsegment()
 	return conn.Conn.Close()
 }
 
 func (conn *driverConn) ResetSession(ctx context.Context) error {
+	conn.closeSubsegment()
 	if sr, ok := conn.Conn.(driver.SessionResetter); ok {
 		return sr.ResetSession(ctx)
 	}

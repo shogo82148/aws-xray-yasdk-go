@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 func init() {
@@ -32,8 +33,10 @@ func (d *fakeDriverCtx) OpenConnector(name string) (driver.Connector, error) {
 	return d.OpenConnectorWithOption(opt)
 }
 
+// fakeDriverCtx is fakeDriver with context support.
 type fakeDriverCtx fakeDriver
 
+// fakeConnector is fakeConnector with context support.
 type fakeConnector struct {
 	driver *fakeDriverCtx
 	opt    *FakeConnOption
@@ -168,6 +171,11 @@ func (c *fakeConnCtx) Exec(query string, args []driver.Value) (driver.Result, er
 }
 
 func (c *fakeConnCtx) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	if strings.Contains(query, "?") {
+		// the query contains placeholders, so we can't use this fast-path.
+		return nil, driver.ErrSkip
+	}
+
 	c.db.printf("[Conn.ExecContext] %s %s", query, convertNamedValuesToString(args))
 	var expect *ExpectExec
 	if err := c.db.fetchExpected(&expect); err != nil {
@@ -190,6 +198,11 @@ func (c *fakeConnCtx) Query(query string, args []driver.Value) (driver.Rows, err
 }
 
 func (c *fakeConnCtx) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if strings.Contains(query, "?") {
+		// the query contains placeholders, so we can't use this fast-path.
+		return nil, driver.ErrSkip
+	}
+
 	c.db.printf("[Conn.QueryContext] %s %s", query, convertNamedValuesToString(args))
 	var expect *ExpectQuery
 	if err := c.db.fetchExpected(&expect); err != nil {

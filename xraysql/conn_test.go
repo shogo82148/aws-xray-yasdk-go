@@ -33,6 +33,96 @@ func TestConn_Exec(t *testing.T) {
 				},
 			},
 			&ExpectExec{
+				Query: "CREATE DATABASE products",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		db := OpenDB(rawConnector)
+		defer db.Close()
+
+		// this query doesn't contain any placeholders, so the driver use fast-path.
+		_, err := db.ExecContext(ctx, "CREATE DATABASE products")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				Namespace: "remote",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CONNECT",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CREATE DATABASE products",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestConn_Exec_ErrSkip(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
+		Name:     "TestConn_ExecSkip",
+		ConnType: "fakeConnExt",
+		Expect: []FakeExpect{
+			&ExpectQuery{
+				Query:   "SELECT version(), current_user, current_database()",
+				Columns: []string{"version()", "current_user", "current_database()"},
+				Rows: [][]driver.Value{
+					{"0.0.0", "postgresql_user", "postgresql"},
+				},
+			},
+			&ExpectExec{
 				Query: "INSERT INTO products VALUES (?, ?, ?)",
 			},
 		},
@@ -46,6 +136,8 @@ func TestConn_Exec(t *testing.T) {
 		defer root.Close()
 		db := OpenDB(rawConnector)
 		defer db.Close()
+
+		// this query contains placeholders, so the driver can't use fast-path.
 		_, err := db.ExecContext(ctx, "INSERT INTO products VALUES (?, ?, ?)", 1, "Cheese", 9.99)
 		if err != nil {
 			t.Fatal(err)
@@ -121,6 +213,96 @@ func TestConn_ExecContext(t *testing.T) {
 				},
 			},
 			&ExpectExec{
+				Query: "CREATE DATABASE products",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		db := OpenDB(rawConnector)
+		defer db.Close()
+
+		// this query doesn't contain any placeholders, so the driver use fast-path.
+		_, err := db.ExecContext(ctx, "CREATE DATABASE products")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		ID:        "xxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CONNECT",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CREATE DATABASE products",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestConn_ExecContext_ErrSkip(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
+		Name:     "TestConn_ExecContext_ErrSkip",
+		ConnType: "fakeConnCtx",
+		Expect: []FakeExpect{
+			&ExpectQuery{
+				Query:   "SELECT version(), current_user, current_database()",
+				Columns: []string{"version()", "current_user", "current_database()"},
+				Rows: [][]driver.Value{
+					{"0.0.0", "postgresql_user", "postgresql"},
+				},
+			},
+			&ExpectExec{
 				Query: "INSERT INTO products VALUES (?, ?, ?)",
 			},
 		},
@@ -134,6 +316,8 @@ func TestConn_ExecContext(t *testing.T) {
 		defer root.Close()
 		db := OpenDB(rawConnector)
 		defer db.Close()
+
+		// this query contains placeholders, so the driver can't use fast-path.
 		_, err := db.ExecContext(ctx, "INSERT INTO products VALUES (?, ?, ?)", 1, "Cheese", 9.99)
 		if err != nil {
 			t.Fatal(err)
@@ -209,6 +393,105 @@ func TestConn_Query(t *testing.T) {
 				},
 			},
 			&ExpectQuery{
+				Query:   "SELECT id, name price FROM products",
+				Columns: []string{"id", "name", "price"},
+				Rows: [][]driver.Value{
+					{1, "Cheese", 9.99},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		db := OpenDB(rawConnector)
+		defer db.Close()
+
+		// this query doesn't contain any placeholders, so the driver uses fast-path.
+		row := db.QueryRowContext(ctx, "SELECT id, name price FROM products")
+		var (
+			id    int64
+			name  string
+			price float64
+		)
+		if err := row.Scan(&id, &name, &price); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		ID:        "xxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CONNECT",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "SELECT id, name price FROM products",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestConn_Query_ErrSkip(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
+		Name:     "TestConn_Query_ErrSkip",
+		ConnType: "fakeConnExt",
+		Expect: []FakeExpect{
+			&ExpectQuery{
+				Query:   "SELECT version(), current_user, current_database()",
+				Columns: []string{"version()", "current_user", "current_database()"},
+				Rows: [][]driver.Value{
+					{"0.0.0", "postgresql_user", "postgresql"},
+				},
+			},
+			&ExpectQuery{
 				Query:   "SELECT id, name price FROM products WHERE id = ?",
 				Columns: []string{"id", "name", "price"},
 				Rows: [][]driver.Value{
@@ -226,6 +509,8 @@ func TestConn_Query(t *testing.T) {
 		defer root.Close()
 		db := OpenDB(rawConnector)
 		defer db.Close()
+
+		// this query contains placeholders, so the driver can't use fast-path.
 		row := db.QueryRowContext(ctx, "SELECT id, name price FROM products WHERE id = ?", 1)
 		var (
 			id    int64
@@ -306,6 +591,105 @@ func TestConn_QueryContext(t *testing.T) {
 				},
 			},
 			&ExpectQuery{
+				Query:   "SELECT id, name price FROM products",
+				Columns: []string{"id", "name", "price"},
+				Rows: [][]driver.Value{
+					{1, "Cheese", 9.99},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	func() {
+		ctx, root := xray.BeginSegment(ctx, "test")
+		defer root.Close()
+		db := OpenDB(rawConnector)
+
+		// this query doesn't contain placeholders, so the driver use fast-path.
+		row := db.QueryRowContext(ctx, "SELECT id, name price FROM products")
+		var (
+			id    int64
+			name  string
+			price float64
+		)
+		if err := row.Scan(&id, &name, &price); err != nil {
+			t.Fatal(err)
+		}
+		defer db.Close()
+	}()
+
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "test",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		ID:        "xxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "detect database type",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "CONNECT",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+			{
+				Name:      "postgresql@github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+				ID:        "xxxxxxxxxxxxxxxx",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Namespace: "remote",
+				SQL: &schema.SQL{
+					SanitizedQuery:  "SELECT id, name price FROM products",
+					DriverVersion:   "github.com/shogo82148/aws-xray-yasdk-go/xraysql",
+					DatabaseType:    "Postgres",
+					DatabaseVersion: "0.0.0",
+					User:            "postgresql_user",
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestConn_QueryContext_ErrSkip(t *testing.T) {
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	rawConnector, err := fdriverctx.OpenConnectorWithOption(&FakeConnOption{
+		Name:     "TestConn_QueryContext_ErrSkip",
+		ConnType: "fakeConnCtx",
+		Expect: []FakeExpect{
+			&ExpectQuery{
+				Query:   "SELECT version(), current_user, current_database()",
+				Columns: []string{"version()", "current_user", "current_database()"},
+				Rows: [][]driver.Value{
+					{"0.0.0", "postgresql_user", "postgresql"},
+				},
+			},
+			&ExpectQuery{
 				Query:   "SELECT id, name price FROM products WHERE id = ?",
 				Columns: []string{"id", "name", "price"},
 				Rows: [][]driver.Value{
@@ -322,6 +706,8 @@ func TestConn_QueryContext(t *testing.T) {
 		ctx, root := xray.BeginSegment(ctx, "test")
 		defer root.Close()
 		db := OpenDB(rawConnector)
+
+		// this query contains placeholders, so the driver can't use fast-path.
 		row := db.QueryRowContext(ctx, "SELECT id, name price FROM products WHERE id = ?", 1)
 		var (
 			id    int64

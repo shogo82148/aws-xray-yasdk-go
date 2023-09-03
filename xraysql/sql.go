@@ -39,10 +39,6 @@ func WithName(name string) Option {
 	}
 }
 
-// we can't know that the original driver will return driver.ErrSkip in advance.
-// so we add this message to the query if it returns driver.ErrSkip.
-const msgErrSkip = " -- skip fast-path; continue as if unimplemented"
-
 // Open xxx
 func Open(driverName, dataSourceName string, opts ...Option) (*sql.DB, error) {
 	name, err := registerDriver(driverName, dataSourceName, opts...)
