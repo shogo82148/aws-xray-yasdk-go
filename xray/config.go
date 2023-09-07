@@ -10,7 +10,7 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 )
 
-// Config is a configure for connecting AWS X-Ray daemon
+// Config is a configure for connecting AWS X-Ray daemon.
 type Config struct {
 	// DaemonAddress is the address for connecting AWS X-Ray daemon.
 	// It overwrites the address from the AWS_XRAY_DAEMON_ADDRESS environment value.
@@ -22,8 +22,10 @@ type Config struct {
 	// It overwrites the setting from the AWS_XRAY_SDK_ENABLED environment value.
 	Disabled bool
 
-	StreamingStrategy      StreamingStrategy
-	SamplingStrategy       sampling.Strategy
+	StreamingStrategy StreamingStrategy
+	SamplingStrategy  sampling.Strategy
+
+	// ContextMissingStrategy specifies the strategy to use when a segment is not associated with a context.
 	ContextMissingStrategy ctxmissing.Strategy
 }
 
