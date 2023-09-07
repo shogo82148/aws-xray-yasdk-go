@@ -15,8 +15,8 @@ import (
 const emptyHostRename = "empty_host_error"
 
 // Client creates a shallow copy of the provided http client,
-// defaulting to http.DefaultClient, with roundtripper wrapped
-// with xrayhttp.RoundTripper.
+// defaulting to http.DefaultClient, with [net/http.RoundTripper] wrapped
+// with [RoundTripper].
 func Client(client *http.Client) *http.Client {
 	if client == nil {
 		client = http.DefaultClient
@@ -26,26 +26,26 @@ func Client(client *http.Client) *http.Client {
 	return &ret
 }
 
-// RoundTripper wraps the provided http roundtripper with xray.Capture,
-// sets HTTP-specific xray fields, and adds the trace header to the outbound request.
+// RoundTripper wraps the provided [net/http.RoundTripper].
+// The wrapped [net/http.RoundTripper] sets HTTP-specific xray fields, and adds the trace header to the outbound request.
 func RoundTripper(rt http.RoundTripper) http.RoundTripper {
 	if rt == nil {
 		rt = http.DefaultTransport
 	}
-	if _, ok := rt.(*roundtripper); ok {
+	if _, ok := rt.(*roundTripper); ok {
 		// X-Ray SDK is already installed
 		return rt
 	}
-	return &roundtripper{
+	return &roundTripper{
 		Base: rt,
 	}
 }
 
-type roundtripper struct {
+type roundTripper struct {
 	Base http.RoundTripper
 }
 
-func (rt *roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	var isEmptyHost bool
 	host := req.Host
 	if host == "" {
