@@ -2,10 +2,10 @@ package ctxmissing
 
 import "context"
 
-// RuntimeErrorStrategy panics when the segment context is missing.
+// RuntimeErrorStrategy is a [Strategy] that panics when the segment context is missing.
 type RuntimeErrorStrategy struct{}
 
-// ContextMissing implements Strategy.
+// ContextMissing implements [Strategy].
 func (*RuntimeErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	panic(v)
 }

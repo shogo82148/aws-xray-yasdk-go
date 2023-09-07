@@ -6,10 +6,10 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
-// LogErrorStrategy logs the error when the segment context is missing.
+// LogErrorStrategy is a [Strategy] that logs the error when the segment context is missing.
 type LogErrorStrategy struct{}
 
-// ContextMissing implements Strategy.
+// ContextMissing implements [Strategy].
 func (*LogErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	xraylog.Errorf(ctx, "AWS X-Ray context missing: %v", v)
 }
