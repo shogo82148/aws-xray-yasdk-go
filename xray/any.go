@@ -1,3 +1,5 @@
+//go:build !go1.18
+
 package xray
 
 // any type is available from Go 1.18.
