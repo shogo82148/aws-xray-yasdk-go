@@ -55,7 +55,8 @@ type httpTracer struct {
 	h      http.Handler
 }
 
-// Handler wraps the provided http handler with xray.Capture
+// Handler wraps the provided [net/http.Handler].
+// The returned [net/http.Handler] creates a sub-segment and collects information of the request.
 func Handler(tn TracingNamer, h http.Handler) http.Handler {
 	return &httpTracer{
 		tn: tn,
@@ -63,7 +64,8 @@ func Handler(tn TracingNamer, h http.Handler) http.Handler {
 	}
 }
 
-// HandlerWithClient wraps the provided http handler with xray.Capture
+// HandlerWithClient wraps the provided [net/http.Handler].
+// The returned [net/http.Handler] creates a sub-segment and collects information of the request.
 func HandlerWithClient(tn TracingNamer, client *xray.Client, h http.Handler) http.Handler {
 	return &httpTracer{
 		tn:     tn,

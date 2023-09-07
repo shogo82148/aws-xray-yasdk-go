@@ -2,6 +2,7 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/shogo82148/aws-xray-yasdk-go)](https://pkg.go.dev/github.com/shogo82148/aws-xray-yasdk-go)
 
 # aws-xray-yasdk-go
+
 Yet Another [AWS X-Ray](https://aws.amazon.com/xray/) SDK for Go
 
 The Yet Another AWS X-Ray SDK for Go is compatible with Go 1.13 and above.
@@ -47,7 +48,7 @@ import (
   "github.com/shogo82148/aws-xray-yasdk-go/xray"
 )
 
-func DoSomethingWithSegment(ctx context.Context) error
+func DoSomethingWithSegment(ctx context.Context) error {
   ctx, seg := xray.BeginSegment(ctx, "service-name")
   defer seg.Close()
 
@@ -92,19 +93,17 @@ import (
 )
 
 func getExample(ctx context.Context) ([]byte, error) {
-  req, err := http.NewRequest(http.MethodGet, "http://example.com")
-  if err != nil {
-    return nil, err
-  }
-  req = req.WithContext(ctx)
+	client := xrayhttp.Client(nil)
 
-  client = xrayhttp.Client(nil)
-  resp, err := client.Do(req)
-  if err != nil {
-      return nil, err
-  }
-  defer resp.Body.Close()
-  return io.ReadAll(resp.Body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com", nil)
+	if seg.AddError(err) {
+		panic(err)
+	}
+	resp, err := client.Do(req)
+	if seg.AddError(err) {
+		panic(err)
+	}
+	defer resp.Body.Close()
 }
 ```
 
