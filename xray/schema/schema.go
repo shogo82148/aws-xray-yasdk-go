@@ -1,5 +1,6 @@
-// Package schema is a utils for generating AWS X-Ray Segment Documents.
-// ref. https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
+// Package schema provides types for [AWS X-Ray Segment Documents].
+//
+// [AWS X-Ray Segment Documents]: https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html
 package schema
 
 import (
@@ -14,7 +15,7 @@ const (
 	OriginElasticBeanstalk = "AWS::ElasticBeanstalk::Environment" // An Elastic Beanstalk environment.
 )
 
-// Segment is a segment
+// Segment is a segment.
 type Segment struct {
 	// Required
 

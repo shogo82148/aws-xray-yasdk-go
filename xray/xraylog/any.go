@@ -1,3 +1,6 @@
+//go:build !go1.18
+// +build !go1.18
+
 package xraylog
 
 // any type is available from Go 1.18.

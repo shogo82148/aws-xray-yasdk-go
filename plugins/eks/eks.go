@@ -1,3 +1,15 @@
+// Package eks provides a plugin for Amazon EKS (Amazon Elastic Kubernetes Service).
+// The plugin collects the information of EKS containers, and record them.
+// The container ID, the pod name, and the cluster name are available.
+//
+// To enable this plugin, please import the eks/init package.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/eks/init"
+//
+// or if you want to load conditionally at runtime, use Init() function.
+//
+//	import _ "github.com/shogo82148/aws-xray-yasdk-go/xray/plugins/eks"
+//	eks.Init()
 package eks
 
 import (
@@ -11,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -29,8 +42,14 @@ type plugin struct {
 	logReferences []*schema.LogReference
 }
 
+var once sync.Once
+
 // Init activates EKS Plugin at runtime.
 func Init() {
+	once.Do(initEKSPlugin)
+}
+
+func initEKSPlugin() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
