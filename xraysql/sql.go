@@ -16,7 +16,7 @@ type config struct {
 type Option func(*config)
 
 // WithConnectionString configures the data source name that is recorded in the X-Ray segment.
-// By default, the tracer doesn't record the data source to avoid recording passwords.
+// By default, the tracer doesn't record the data source to avoid recording secrets such as passwords.
 func WithConnectionString(str string) Option {
 	return func(cfg *config) {
 		cfg.connectionString = str
@@ -24,7 +24,7 @@ func WithConnectionString(str string) Option {
 }
 
 // WithURL configures the url of data source that is recorded in the X-Ray segment.
-// By default, the tracer doesn't record the data source to avoid recording passwords.
+// By default, the tracer doesn't record the data source to avoid recording secrets such as passwords.
 func WithURL(url string) Option {
 	return func(cfg *config) {
 		cfg.url = url
@@ -39,7 +39,8 @@ func WithName(name string) Option {
 	}
 }
 
-// Open xxx
+// Open is a drop-in replacement for [database/sql.Open].
+// It returns a [*database/sql.DB] that is instrumented for AWS X-Ray.
 func Open(driverName, dataSourceName string, opts ...Option) (*sql.DB, error) {
 	name, err := registerDriver(driverName, dataSourceName, opts...)
 	if err != nil {
@@ -73,7 +74,8 @@ func registerDriver(driverName, dataSourceName string, opts ...Option) (string, 
 	return name, nil
 }
 
-// OpenDB xxx
+// OpenDB is a drop-in replacement for [database/sql.OpenDB].
+// It returns a [*database/sql.DB] that is instrumented for AWS X-Ray.
 func OpenDB(c driver.Connector, opts ...Option) *sql.DB {
 	return sql.OpenDB(NewConnector(c, opts...))
 }
