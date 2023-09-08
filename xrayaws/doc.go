@@ -1,4 +1,4 @@
-// Package xrayaws traces AWS SDK Go requests using AWS X-Ray.
+// Package xrayaws provides AWS X-Ray tracing for AWS SDK for Go v1.
 //
 //	sess := session.Must(session.NewSession())
 //	svc := dynamodb.New(sess)
