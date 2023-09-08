@@ -9,3 +9,8 @@ type RuntimeErrorStrategy struct{}
 func (*RuntimeErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	panic(v)
 }
+
+// NewRuntimeErrorStrategy returns a new RuntimeErrorStrategy.
+func NewRuntimeErrorStrategy() *RuntimeErrorStrategy {
+	return &RuntimeErrorStrategy{}
+}
