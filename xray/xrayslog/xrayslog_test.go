@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
+	"path/filepath"
 	"testing"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 func TestHandle_WithoutTraceID(t *testing.T) {
@@ -131,5 +133,44 @@ func TestWithGroup_WithTraceID(t *testing.T) {
 	group, _ = group["my-group2"].(map[string]any)
 	if group == nil || group["foo"] != "bar" {
 		t.Errorf("foo is not set: %s", w.String())
+	}
+}
+
+func TestNewXRayLogger(t *testing.T) {
+	// build the logger
+	w := &bytes.Buffer{}
+	h := slog.NewJSONHandler(w, &slog.HandlerOptions{
+		AddSource: true,
+	})
+
+	// log
+	ctx := context.Background()
+	logger := NewXRayLogger(h)
+	ctx = xraylog.WithLogger(ctx, logger)
+	xraylog.Info(ctx, "Hello, World!")
+
+	// check the result
+	var v struct {
+		Msg    string
+		Level  string
+		Source struct {
+			Function string
+			File     string
+		}
+	}
+	if err := json.Unmarshal(w.Bytes(), &v); err != nil {
+		t.Error(err)
+	}
+	if v.Msg != "Hello, World!" {
+		t.Errorf("unexpected message: %s", v.Msg)
+	}
+	if v.Level != "INFO" {
+		t.Errorf("unexpected level: %s", v.Level)
+	}
+	if filepath.Base(v.Source.File) != "xrayslog_test.go" {
+		t.Errorf("unexpected source file: %s", v.Source.File)
+	}
+	if v.Source.Function != "github.com/shogo82148/aws-xray-yasdk-go/xray/xrayslog.TestNewXRayLogger" {
+		t.Errorf("unexpected source function: %s", v.Source.Function)
 	}
 }

@@ -104,7 +104,7 @@ func (l *xrayLogger) Log(ctx context.Context, level xraylog.LogLevel, msg fmt.St
 	var pcs [1]uintptr
 	runtime.Callers(3, pcs[:])
 
-	record := slog.NewRecord(time.Now(), slog.Level(level), msg.String(), pcs[0])
+	record := slog.NewRecord(time.Now(), lv, msg.String(), pcs[0])
 	l.h.Handle(ctx, record)
 }
 
