@@ -1,3 +1,4 @@
+// Package whitelist provides whitelist of parameters for aws api.
 package whitelist
 
 import (
@@ -24,7 +25,7 @@ type Operation struct {
 	ResponseParameters  []string               `json:"response_parameters,omitempty"`
 }
 
-// Descriptor is a rule for recording the paremeter.
+// Descriptor is a rule for recording the parameter.
 type Descriptor struct {
 	Map      bool   `json:"map,omitempty"`
 	GetKeys  bool   `json:"get_keys"`
