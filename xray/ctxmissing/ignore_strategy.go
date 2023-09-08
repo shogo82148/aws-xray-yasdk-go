@@ -12,7 +12,7 @@ func (*IgnoreStrategy) ContextMissing(ctx context.Context, v any) {
 	// do nothing
 }
 
-// NewIgnoreStrategy returns a new IgnoreStrategy.
+// NewIgnoreStrategy returns a new [IgnoreStrategy].
 func NewIgnoreStrategy() *IgnoreStrategy {
 	return &IgnoreStrategy{}
 }

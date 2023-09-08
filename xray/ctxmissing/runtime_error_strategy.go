@@ -10,7 +10,7 @@ func (*RuntimeErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	panic(v)
 }
 
-// NewRuntimeErrorStrategy returns a new RuntimeErrorStrategy.
+// NewRuntimeErrorStrategy returns a new [RuntimeErrorStrategy].
 func NewRuntimeErrorStrategy() *RuntimeErrorStrategy {
 	return &RuntimeErrorStrategy{}
 }
