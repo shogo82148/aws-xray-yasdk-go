@@ -13,3 +13,8 @@ type LogErrorStrategy struct{}
 func (*LogErrorStrategy) ContextMissing(ctx context.Context, v any) {
 	xraylog.Errorf(ctx, "AWS X-Ray context missing: %v", v)
 }
+
+// NewLogErrorStrategy returns a new [LogErrorStrategy].
+func NewLogErrorStrategy() *LogErrorStrategy {
+	return &LogErrorStrategy{}
+}
