@@ -5,8 +5,8 @@ import (
 	"context"
 	crand "crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"net"
 	"net/http"
@@ -16,9 +16,6 @@ import (
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
-
-const defaultInterval = int64(10)
-const manifestTTL = 3600 // Seconds
 
 var client = &http.Client{
 	Transport: &http.Transport{
@@ -207,7 +204,7 @@ func NewCentralizedStrategy(addr string, manifest *Manifest) (*CentralizedStrate
 	return &CentralizedStrategy{
 		fallback:     local,
 		addr:         addr,
-		clientID:     fmt.Sprintf("%x", r),
+		clientID:     hex.EncodeToString(r[:]),
 		pollerCtx:    pollerCtx,
 		pollerCancel: pollerCancel,
 		manifest: &centralizedManifest{
@@ -525,7 +522,7 @@ func (s *CentralizedStrategy) refreshQuota() {
 	// TODO update the interval.
 
 	if needRefresh {
-		xraylog.Debug(ctx, "chaning sampling rules is detected. refresh them.")
+		xraylog.Debug(ctx, "changing sampling rules is detected. refresh them.")
 		go s.refreshRule()
 	}
 }
