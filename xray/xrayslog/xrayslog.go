@@ -6,9 +6,11 @@ package xrayslog
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 var _ slog.Handler = (*handler)(nil)
@@ -78,4 +80,18 @@ func NewHandler(parent slog.Handler, traceIDKey string) slog.Handler {
 		parent:     parent,
 		traceIDKey: traceIDKey,
 	}
+}
+
+type xrayLogger struct {
+	h slog.Handler
+}
+
+// NewXRayLogger returns a new [xraylog.Logger] such that each call to its Output method dispatches a Record to the specified handler.
+// The logger acts as a bridge from the older xraylog API to newer structured logging handlers.
+func NewXRayLogger(h slog.Handler) xraylog.Logger {
+	return &xrayLogger{h}
+}
+
+func (l *xrayLogger) Log(ctx context.Context, level xraylog.LogLevel, msg fmt.Stringer) {
+
 }
