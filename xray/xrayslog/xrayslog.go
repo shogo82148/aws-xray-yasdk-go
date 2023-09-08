@@ -8,6 +8,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime"
+	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
@@ -93,5 +95,30 @@ func NewXRayLogger(h slog.Handler) xraylog.Logger {
 }
 
 func (l *xrayLogger) Log(ctx context.Context, level xraylog.LogLevel, msg fmt.Stringer) {
+	lv := xraylogLevelToSlog(level)
+	if !l.h.Enabled(ctx, lv) {
+		return
+	}
 
+	// skip [runtime.Callers, l.Log, xraylog.Info]
+	var pcs [1]uintptr
+	runtime.Callers(3, pcs[:])
+
+	record := slog.NewRecord(time.Now(), slog.Level(level), msg.String(), pcs[0])
+	l.h.Handle(ctx, record)
+}
+
+func xraylogLevelToSlog(l xraylog.LogLevel) slog.Level {
+	switch l {
+	case xraylog.LogLevelDebug:
+		return slog.LevelDebug
+	case xraylog.LogLevelInfo:
+		return slog.LevelInfo
+	case xraylog.LogLevelWarn:
+		return slog.LevelWarn
+	case xraylog.LogLevelError:
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
