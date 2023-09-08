@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
-	"github.com/shogo82148/aws-xray-yasdk-go/xrayslog"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xrayslog"
 )
 
 func ExampleNewHandler() {

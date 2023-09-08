@@ -6,9 +6,13 @@ package xrayslog
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"runtime"
+	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
+	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
 var _ slog.Handler = (*handler)(nil)
@@ -77,5 +81,44 @@ func NewHandler(parent slog.Handler, traceIDKey string) slog.Handler {
 	return &handler{
 		parent:     parent,
 		traceIDKey: traceIDKey,
+	}
+}
+
+type xrayLogger struct {
+	h slog.Handler
+}
+
+// NewXRayLogger returns a new [xraylog.Logger] such that each call to its Output method dispatches a Record to the specified handler.
+// The logger acts as a bridge from the older xraylog API to newer structured logging handlers.
+func NewXRayLogger(h slog.Handler) xraylog.Logger {
+	return &xrayLogger{h}
+}
+
+func (l *xrayLogger) Log(ctx context.Context, level xraylog.LogLevel, msg fmt.Stringer) {
+	lv := xraylogLevelToSlog(level)
+	if !l.h.Enabled(ctx, lv) {
+		return
+	}
+
+	// skip [runtime.Callers, l.Log, xraylog.Info]
+	var pcs [1]uintptr
+	runtime.Callers(3, pcs[:])
+
+	record := slog.NewRecord(time.Now(), lv, msg.String(), pcs[0])
+	l.h.Handle(ctx, record)
+}
+
+func xraylogLevelToSlog(l xraylog.LogLevel) slog.Level {
+	switch l {
+	case xraylog.LogLevelDebug:
+		return slog.LevelDebug
+	case xraylog.LogLevelInfo:
+		return slog.LevelInfo
+	case xraylog.LogLevelWarn:
+		return slog.LevelWarn
+	case xraylog.LogLevelError:
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
 }
