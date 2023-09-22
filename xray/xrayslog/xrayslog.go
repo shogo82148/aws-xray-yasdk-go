@@ -1,7 +1,7 @@
 //go:build go1.21
 // +build go1.21
 
-// Package xrayslog provides a [log/slog.Handler] that adds trace ID to the log record.
+// Package xrayslog provides utilities for interfacing with the slog package.
 package xrayslog
 
 import (
@@ -100,7 +100,7 @@ func (h *handler) WithGroup(name string) slog.Handler {
 	return &h2
 }
 
-// NewHandler returns a slog.Handler that adds trace ID to the log record.
+// NewHandler returns a [slog.Handler] that adds trace ID to the log record.
 func NewHandler(parent slog.Handler, traceIDKey string) slog.Handler {
 	return &handler{
 		parent:     parent,
@@ -115,7 +115,10 @@ type xrayLogger struct {
 
 // NewXRayLogger returns a new [xraylog.Logger] such that each call to its Output method dispatches a Record to the specified handler.
 // The logger acts as a bridge from the older xraylog API to newer structured logging handlers.
-// The log level is determined by the environment variable AWS_XRAY_LOG_LEVEL.
+// The log level can be set by using either the AWS_XRAY_DEBUG_MODE or AWS_XRAY_LOG_LEVEL environment variables.
+// If AWS_XRAY_DEBUG_MODE is set, the log level is set to the debug level.
+// AWS_XRAY_LOG_LEVEL may be set to debug, info, warn, error or silent.
+// This value is ignored if AWS_XRAY_DEBUG_MODE is set.
 func NewXRayLogger(h slog.Handler) xraylog.Logger {
 	return NewXRayLoggerWithMinLevel(h, getLogLevelFromEnv())
 }
