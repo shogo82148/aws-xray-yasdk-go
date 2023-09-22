@@ -78,6 +78,9 @@ const (
 
 	// LogLevelError is error level.
 	LogLevelError
+
+	// LogLevelSilent disables the log of the xray tracer.
+	LogLevelSilent
 )
 
 func (ll LogLevel) String() string {
