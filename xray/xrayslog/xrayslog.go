@@ -1,19 +1,43 @@
 //go:build go1.21
 // +build go1.21
 
-// Package xrayslog provides a [log/slog.Handler] that adds trace ID to the log record.
+// Package xrayslog provides utilities for interfacing with the slog package.
 package xrayslog
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
+
+func getLogLevelFromEnv() xraylog.LogLevel {
+	level := xraylog.LogLevelInfo
+	if os.Getenv("AWS_XRAY_DEBUG_MODE") != "" {
+		level = xraylog.LogLevelDebug
+	} else if env := os.Getenv("AWS_XRAY_LOG_LEVEL"); env != "" {
+		env = strings.ToLower(env)
+		switch env {
+		case "debug":
+			level = xraylog.LogLevelDebug
+		case "info":
+			level = xraylog.LogLevelInfo
+		case "warn":
+			level = xraylog.LogLevelWarn
+		case "error":
+			level = xraylog.LogLevelError
+		case "silent":
+			return xraylog.LogLevelSilent
+		}
+	}
+	return level
+}
 
 var _ slog.Handler = (*handler)(nil)
 
@@ -76,7 +100,7 @@ func (h *handler) WithGroup(name string) slog.Handler {
 	return &h2
 }
 
-// NewHandler returns a slog.Handler that adds trace ID to the log record.
+// NewHandler returns a [slog.Handler] that adds trace ID to the log record.
 func NewHandler(parent slog.Handler, traceIDKey string) slog.Handler {
 	return &handler{
 		parent:     parent,
@@ -85,16 +109,34 @@ func NewHandler(parent slog.Handler, traceIDKey string) slog.Handler {
 }
 
 type xrayLogger struct {
-	h slog.Handler
+	h        slog.Handler
+	minLevel xraylog.LogLevel
 }
 
 // NewXRayLogger returns a new [xraylog.Logger] such that each call to its Output method dispatches a Record to the specified handler.
 // The logger acts as a bridge from the older xraylog API to newer structured logging handlers.
+// The log level can be set by using either the AWS_XRAY_DEBUG_MODE or AWS_XRAY_LOG_LEVEL environment variables.
+// If AWS_XRAY_DEBUG_MODE is set, the log level is set to the debug level.
+// AWS_XRAY_LOG_LEVEL may be set to debug, info, warn, error or silent.
+// This value is ignored if AWS_XRAY_DEBUG_MODE is set.
 func NewXRayLogger(h slog.Handler) xraylog.Logger {
-	return &xrayLogger{h}
+	return NewXRayLoggerWithMinLevel(h, getLogLevelFromEnv())
+}
+
+// NewXRayLoggerWithMinLevel returns a new [xraylog.Logger] such that each call to its Output method dispatches a Record to the specified handler.
+// The logger acts as a bridge from the older xraylog API to newer structured logging handlers.
+func NewXRayLoggerWithMinLevel(h slog.Handler, minLogLevel xraylog.LogLevel) xraylog.Logger {
+	if minLogLevel == xraylog.LogLevelSilent {
+		return xraylog.NullLogger{}
+	}
+	return &xrayLogger{h, minLogLevel}
 }
 
 func (l *xrayLogger) Log(ctx context.Context, level xraylog.LogLevel, msg fmt.Stringer) {
+	if level < l.minLevel {
+		return
+	}
+
 	lv := xraylogLevelToSlog(level)
 	if !l.h.Enabled(ctx, lv) {
 		return

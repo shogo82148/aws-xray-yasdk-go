@@ -15,6 +15,42 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
 )
 
+func Test_getLogLevelFromEnv(t *testing.T) {
+	t.Run("AWS_XRAY_DEBUG_MODE is enable", func(t *testing.T) {
+		t.Setenv("AWS_XRAY_DEBUG_MODE", "1")
+		t.Setenv("AWS_XRAY_LOG_LEVEL", "info")
+		got := getLogLevelFromEnv()
+		want := xraylog.LogLevelDebug
+		if got != want {
+			t.Errorf("got %v; want %v", got, want)
+		}
+	})
+
+	tests := []struct {
+		env  string
+		want xraylog.LogLevel
+	}{
+		{"debug", xraylog.LogLevelDebug},
+		{"info", xraylog.LogLevelInfo},
+		{"warn", xraylog.LogLevelWarn},
+		{"error", xraylog.LogLevelError},
+		{"silent", xraylog.LogLevelSilent},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.env, func(t *testing.T) {
+			t.Setenv("AWS_XRAY_DEBUG_MODE", "")
+			t.Setenv("AWS_XRAY_LOG_LEVEL", tt.env)
+			got := getLogLevelFromEnv()
+			want := tt.want
+			if got != want {
+				t.Errorf("got %v; want %v", got, want)
+			}
+		})
+	}
+}
+
 func TestHandle_WithoutTraceID(t *testing.T) {
 	// build the logger
 	w := &bytes.Buffer{}
@@ -145,9 +181,10 @@ func TestNewXRayLogger(t *testing.T) {
 
 	// log
 	ctx := context.Background()
-	logger := NewXRayLogger(h)
+	logger := NewXRayLoggerWithMinLevel(h, xraylog.LogLevelInfo)
 	ctx = xraylog.WithLogger(ctx, logger)
 	xraylog.Info(ctx, "Hello, World!")
+	xraylog.Debug(ctx, "Hello, It's debug log and should be ignored")
 
 	// check the result
 	var v struct {
