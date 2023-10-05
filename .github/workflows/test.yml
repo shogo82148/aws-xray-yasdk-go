@@ -21,8 +21,6 @@ jobs:
           - "1.20"
           - "1.19"
           - "1.18"
-          - "1.17"
-          - "1.16"
         goexperiment: [""]
         include:
           # test with GOEXPERIMENT=loopvar
