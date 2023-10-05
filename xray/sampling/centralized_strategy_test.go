@@ -218,3 +218,28 @@ func TestCentralizedStrategy_refreshQuota(t *testing.T) {
 		t.Errorf("unexpected ttl: want %d, got %d", 1000000000, quota.ttl.Unix())
 	}
 }
+
+func TestIsDirectIPAccess(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"example.com", false},
+		{"example.com:80", false},
+		{"192.0.2.1", true},
+		{"192.0.2.1:80", true},
+		{"198.51.100.1", true},
+		{"198.51.100.1:80", true},
+		{"2001:db8::1", true},
+		{"[2001:db8::1]:80", true},
+	}
+
+	for _, tt := range tests {
+		req := &Request{
+			Host: tt.input,
+		}
+		if got := isDirectIPAccess(req); got != tt.want {
+			t.Errorf("unexpected result: want %t, got %t", tt.want, got)
+		}
+	}
+}

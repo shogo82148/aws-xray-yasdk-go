@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/netip"
 	"sort"
 	"sync"
 	"time"
@@ -299,6 +300,12 @@ func (s *CentralizedStrategy) Close() {
 
 // ShouldTrace implements Strategy.
 func (s *CentralizedStrategy) ShouldTrace(req *Request) *Decision {
+	if isDirectIPAccess(req) {
+		return &Decision{
+			Sample: false,
+		}
+	}
+
 	s.startOnce.Do(s.start)
 	manifest := s.getManifest()
 	if manifest == nil {
@@ -315,6 +322,21 @@ func (s *CentralizedStrategy) ShouldTrace(req *Request) *Decision {
 	// It should not reach here, because the Default Rule matches any requests.
 	// The manifest is wrong, so fallback to local strategy.
 	return s.fallback.ShouldTrace(req)
+}
+
+// Nowadays, access using virtual host functionality is mostly used,
+// and there are few cases where access is made by directly specifying an IP address.
+// Therefore, if access is made by directly specifying an IP address,
+// we do not perform sampling.
+func isDirectIPAccess(req *Request) bool {
+	hostport := req.Host
+	host, _, err := net.SplitHostPort(hostport)
+	if err != nil {
+		host = hostport
+	}
+
+	_, err = netip.ParseAddr(host)
+	return err == nil
 }
 
 func (s *CentralizedStrategy) getManifest() *centralizedManifest {
