@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
@@ -100,7 +101,7 @@ func TestClient(t *testing.T) {
 	WithXRay()(&opt)
 	cfg := aws.Config{
 		Region: "fake-moon-1",
-		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				URL:         ts.URL,
 				SigningName: "lambda",
@@ -109,7 +110,8 @@ func TestClient(t *testing.T) {
 		Retryer: func() aws.Retryer {
 			return aws.NopRetryer{}
 		},
-		APIOptions: opt.APIOptions,
+		APIOptions:  opt.APIOptions,
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
 	}
 
 	// start testing
@@ -134,7 +136,7 @@ func TestClient(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "lambda",
+				Name:      "none",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
@@ -219,7 +221,7 @@ func TestClient_FailDial(t *testing.T) {
 	WithXRay()(&opt)
 	cfg := aws.Config{
 		Region: "fake-moon-1",
-		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				// we expected no Gopher daemon on this computer ʕ◔ϖ◔ʔ
 				URL:         "http://127.0.0.1:70",
@@ -229,7 +231,8 @@ func TestClient_FailDial(t *testing.T) {
 		Retryer: func() aws.Retryer {
 			return aws.NopRetryer{}
 		},
-		APIOptions: opt.APIOptions,
+		APIOptions:  opt.APIOptions,
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
 	}
 
 	// start testing
@@ -263,7 +266,7 @@ func TestClient_FailDial(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "lambda",
+				Name:      "none",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
@@ -371,7 +374,7 @@ func TestClient_BadRequest(t *testing.T) {
 	WithXRay()(&opt)
 	cfg := aws.Config{
 		Region: "fake-moon-1",
-		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				URL:         ts.URL,
 				SigningName: "lambda",
@@ -380,7 +383,8 @@ func TestClient_BadRequest(t *testing.T) {
 		Retryer: func() aws.Retryer {
 			return aws.NopRetryer{}
 		},
-		APIOptions: opt.APIOptions,
+		APIOptions:  opt.APIOptions,
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
 	}
 
 	// start testing
@@ -394,7 +398,7 @@ func TestClient_BadRequest(t *testing.T) {
 	awsErr := err
 	var httpErr *awshttp.ResponseError
 	if !errors.As(err, &httpErr) {
-		t.Error("expected *smithyhttp.ResponseError, but not")
+		t.Fatalf("expected *smithyhttp.ResponseError, but got %T", err)
 	}
 
 	// check the segment
@@ -414,7 +418,7 @@ func TestClient_BadRequest(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "lambda",
+				Name:      "none",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
