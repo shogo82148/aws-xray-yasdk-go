@@ -212,7 +212,14 @@ func BeginDummySegment(ctx context.Context) (context.Context, *Segment) {
 //
 // Caller should close the segment when the work is done.
 func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) {
-	return beginSegment(ctx, name, TraceHeader{}, nil)
+	return beginSegment(ctx, nowFunc(), name, TraceHeader{}, nil)
+}
+
+// BeginSegmentAt creates a new Segment for a given time, name and context.
+//
+// Caller should close the segment when the work is done.
+func BeginSegmentAt(ctx context.Context, now time.Time, name string) (context.Context, *Segment) {
+	return beginSegment(ctx, now, name, TraceHeader{}, nil)
 }
 
 // BeginSegmentWithRequest creates a new Segment for a given name and context.
@@ -220,7 +227,7 @@ func BeginSegment(ctx context.Context, name string) (context.Context, *Segment) 
 //
 // Caller should close the segment when the work is done.
 func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) (context.Context, *Segment) {
-	return beginSegment(ctx, name, TraceHeader{}, r)
+	return beginSegment(ctx, nowFunc(), name, TraceHeader{}, r)
 }
 
 // BeginSegmentWithHeader creates a new Segment for a given name, context, and trace header.
@@ -229,10 +236,11 @@ func BeginSegmentWithRequest(ctx context.Context, name string, r *http.Request) 
 //
 // Caller should close the segment when the work is done.
 func BeginSegmentWithHeader(ctx context.Context, name, header string) (context.Context, *Segment) {
-	return beginSegment(ctx, name, ParseTraceHeader(header), nil)
+	return beginSegment(ctx, nowFunc(), name, ParseTraceHeader(header), nil)
 }
 
-func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Request) (context.Context, *Segment) {
+// beginSegment creates a new Segment for a given name and context.
+func beginSegment(ctx context.Context, now time.Time, name string, h TraceHeader, r *http.Request) (context.Context, *Segment) {
 	// inject trace id into the context
 	if r != nil {
 		h = ParseTraceHeader(r.Header.Get(TraceIDHeaderKey))
@@ -252,7 +260,7 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 		ctx:           ctx,
 		name:          sanitizeSegmentName(name),
 		id:            NewSegmentID(),
-		startTime:     nowFunc(),
+		startTime:     now,
 		totalSegments: 1,
 		origin:        origin(),
 	}
@@ -303,12 +311,10 @@ func beginSegment(ctx context.Context, name string, h TraceHeader, r *http.Reque
 	return WithSegment(ctx, seg), seg
 }
 
-// BeginSubsegment creates a new Segment for a given name and context.
+// BeginSubsegmentAt creates a new Segment for a given time, name and context.
 //
 // Caller should close the segment when the work is done.
-func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segment) {
-	now := nowFunc()
-
+func BeginSubsegmentAt(ctx context.Context, now time.Time, name string) (context.Context, *Segment) {
 	value := ctx.Value(segmentContextKey)
 	if value == nil {
 		if header := ctx.Value(lambdaContextKey); header != nil {
@@ -350,6 +356,13 @@ func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segmen
 	parent.subsegments = append(parent.subsegments, seg)
 
 	return ctx, seg
+}
+
+// BeginSubsegment creates a new Segment for a given name and context.
+//
+// Caller should close the segment when the work is done.
+func BeginSubsegment(ctx context.Context, name string) (context.Context, *Segment) {
+	return BeginSubsegmentAt(ctx, nowFunc(), name)
 }
 
 // Sampled returns whether the current segment is sampled.
