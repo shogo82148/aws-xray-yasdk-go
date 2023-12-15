@@ -136,7 +136,7 @@ func TestClient(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "none",
+				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
@@ -266,7 +266,7 @@ func TestClient_FailDial(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "none",
+				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
@@ -418,7 +418,7 @@ func TestClient_BadRequest(t *testing.T) {
 		EndTime:   timeFilled,
 		Subsegments: []*schema.Segment{
 			{
-				Name:      "none",
+				Name:      "lambda",
 				ID:        "xxxxxxxxxxxxxxxx",
 				Namespace: "aws",
 				StartTime: timeFilled,
