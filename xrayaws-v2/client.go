@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sync"
+	"time"
 
 	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -19,17 +20,30 @@ import (
 //go:generate go run codegen.go
 
 type subsegments struct {
-	mu            sync.Mutex
+	mu sync.Mutex
+
+	name           string
+	initializeTime time.Time
+	marshalTime    time.Time
+
 	ctx           context.Context
 	awsCtx        context.Context
 	awsSeg        *xray.Segment
-	marshalCtx    context.Context
-	marshalSeg    *xray.Segment
 	attemptCtx    context.Context
 	attemptSeg    *xray.Segment
 	attemptCancel context.CancelFunc
 	unmarshalCtx  context.Context
 	unmarshalSeg  *xray.Segment
+}
+
+func (segs *subsegments) closeRoot() {
+	segs.mu.Lock()
+	defer segs.mu.Unlock()
+
+	if segs.awsCtx != nil {
+		segs.awsSeg.Close()
+		segs.awsCtx, segs.awsSeg = nil, nil
+	}
 }
 
 // close all segments except root.
@@ -42,10 +56,6 @@ func (segs *subsegments) closeExceptRoot() {
 		segs.attemptSeg.Close()
 		segs.attemptCancel = nil
 		segs.attemptCtx, segs.attemptSeg = nil, nil
-	}
-	if segs.marshalCtx != nil {
-		segs.marshalSeg.Close()
-		segs.marshalCtx, segs.marshalSeg = nil, nil
 	}
 	if segs.unmarshalCtx != nil {
 		segs.unmarshalSeg.Close()
@@ -70,10 +80,10 @@ func (m xrayMiddleware) HandleInitialize(
 		ctx: ctx,
 	}
 	ctx = context.WithValue(ctx, segmentsContextKey, segs)
-	segs.awsCtx, segs.awsSeg = xray.BeginSubsegment(ctx, awsmiddle.GetSigningName(ctx))
-	defer segs.awsSeg.Close()
+	segs.initializeTime = time.Now()
+
+	defer segs.closeRoot()       // make sure root segment closed
 	defer segs.closeExceptRoot() // make share all segments closed
-	segs.awsSeg.SetNamespace("aws")
 
 	out, metadata, err = next.HandleInitialize(ctx, in)
 	if err != nil {
@@ -83,12 +93,12 @@ func (m xrayMiddleware) HandleInitialize(
 			Err:           err,
 		})
 	}
-	aws := schema.AWS{}
-	m.o.insertParameter(aws, awsmiddle.GetSigningName(ctx), awsmiddle.GetOperationName(ctx), in.Parameters, out.Result)
-	segs.awsSeg.SetAWS(aws)
-
-	segs.closeExceptRoot()
-
+	if segs.awsSeg != nil {
+		aws := schema.AWS{}
+		m.o.insertParameter(aws, segs.name, awsmiddle.GetOperationName(ctx), in.Parameters, out.Result)
+		segs.awsSeg.SetNamespace("aws")
+		segs.awsSeg.SetAWS(aws)
+	}
 	return
 }
 
@@ -105,7 +115,7 @@ func (beginMarshalMiddleware) HandleSerialize(
 ) {
 	if segs := contextSubsegments(ctx); segs != nil {
 		segs.mu.Lock()
-		segs.marshalCtx, segs.marshalSeg = xray.BeginSubsegment(segs.awsCtx, "marshal")
+		segs.marshalTime = time.Now()
 		segs.mu.Unlock()
 	}
 	return next.HandleSerialize(ctx, in)
@@ -124,10 +134,13 @@ func (endMarshalMiddleware) HandleBuild(
 ) {
 	if segs := contextSubsegments(ctx); segs != nil {
 		segs.mu.Lock()
-		if segs.marshalCtx != nil {
-			segs.marshalSeg.Close()
-			segs.marshalCtx, segs.marshalSeg = nil, nil
-		}
+
+		name := awsmiddle.GetSigningName(ctx)
+		segs.name = name
+		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, name)
+
+		_, marshalSeg := xray.BeginSubsegmentAt(segs.awsCtx, segs.marshalTime, "marshal")
+		marshalSeg.Close()
 		segs.mu.Unlock()
 	}
 	return next.HandleBuild(ctx, in)
