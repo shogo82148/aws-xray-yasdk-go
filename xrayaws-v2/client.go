@@ -3,6 +3,7 @@ package xrayaws
 import (
 	"context"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,7 +78,8 @@ func (m xrayMiddleware) HandleInitialize(
 	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
 ) {
 	segs := &subsegments{
-		ctx: ctx,
+		name: m.o.name,
+		ctx:  ctx,
 	}
 	ctx = context.WithValue(ctx, segmentsContextKey, segs)
 	segs.initializeTime = time.Now()
@@ -121,36 +123,65 @@ func (beginMarshalMiddleware) HandleSerialize(
 	return next.HandleSerialize(ctx, in)
 }
 
-type endMarshalMiddleware struct {
-	o *option
-}
+type endMarshalMiddleware struct{}
 
 func (endMarshalMiddleware) ID() string {
 	return "XRayEndMarshalMiddleware"
 }
 
-func (m endMarshalMiddleware) HandleBuild(
-	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
-) (
-	out middleware.BuildOutput, metadata middleware.Metadata, err error,
+func (m endMarshalMiddleware) HandleFinalize(ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler) (
+	out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
 ) {
 	if segs := contextSubsegments(ctx); segs != nil {
 		segs.mu.Lock()
 
-		var name string
-		if m.o.name != "" {
-			name = m.o.name
-		} else {
-			name = awsmiddle.GetSigningName(ctx)
+		if segs.name == "" {
+			segs.name = getServiceName(ctx, in)
 		}
-		segs.name = name
-		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, name)
+		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, segs.name)
 
 		_, marshalSeg := xray.BeginSubsegmentAt(segs.awsCtx, segs.marshalTime, "marshal")
 		marshalSeg.Close()
 		segs.mu.Unlock()
 	}
-	return next.HandleBuild(ctx, in)
+	return next.HandleFinalize(ctx, in)
+}
+
+func getServiceName(ctx context.Context, in middleware.FinalizeInput) string {
+	if name := awsmiddle.GetSigningName(ctx); name != "" {
+		return name
+	}
+	req, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return awsmiddle.GetServiceID(ctx)
+	}
+
+	const prefix = "AWS4-HMAC-SHA256 "
+	auth := req.Header.Get("Authorization")
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return awsmiddle.GetServiceID(ctx)
+	}
+	auth = auth[len(prefix):]
+	parts := strings.Split(auth, ",")
+	for _, part := range parts {
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key != "Credential" {
+			continue
+		}
+
+		cred := strings.Split(value, "/")
+		if len(cred) < 4 {
+			return awsmiddle.GetServiceID(ctx)
+		}
+		return cred[3]
+	}
+
+	return awsmiddle.GetServiceID(ctx)
 }
 
 type beginAttemptMiddleware struct{}
@@ -289,7 +320,7 @@ type option struct {
 func (o *option) addMiddleware(stack *middleware.Stack) error {
 	stack.Initialize.Add(xrayMiddleware{o: o}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
-	stack.Build.Add(endMarshalMiddleware{o: o}, middleware.After)
+	stack.Finalize.Insert(endMarshalMiddleware{}, "Signing", middleware.After)
 	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
 	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
 	return nil
