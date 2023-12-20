@@ -121,13 +121,15 @@ func (beginMarshalMiddleware) HandleSerialize(
 	return next.HandleSerialize(ctx, in)
 }
 
-type endMarshalMiddleware struct{}
+type endMarshalMiddleware struct {
+	o *option
+}
 
 func (endMarshalMiddleware) ID() string {
 	return "XRayEndMarshalMiddleware"
 }
 
-func (endMarshalMiddleware) HandleBuild(
+func (m endMarshalMiddleware) HandleBuild(
 	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
 ) (
 	out middleware.BuildOutput, metadata middleware.Metadata, err error,
@@ -135,7 +137,12 @@ func (endMarshalMiddleware) HandleBuild(
 	if segs := contextSubsegments(ctx); segs != nil {
 		segs.mu.Lock()
 
-		name := awsmiddle.GetSigningName(ctx)
+		var name string
+		if m.o.name != "" {
+			name = m.o.name
+		} else {
+			name = awsmiddle.GetSigningName(ctx)
+		}
 		segs.name = name
 		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, name)
 
@@ -251,13 +258,21 @@ var segmentsContextKey = &contextKey{"segments"}
 
 // WithXRay is the X-Ray tracing option.
 func WithXRay() config.LoadOptionsFunc {
-	return WithWhitelist(defaultWhitelist)
+	return WithServiceName("", defaultWhitelist)
 }
 
 // WithWhitelist returns a X-Ray tracing option with custom whitelist.
 func WithWhitelist(whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
+	return WithServiceName("", whitelist)
+}
+
+// WithServiceName returns a X-Ray tracing option with custom service name.
+func WithServiceName(name string, whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
 	return func(o *config.LoadOptions) error {
-		newOption := option{whitelist: whitelist}
+		newOption := option{
+			name:      name,
+			whitelist: whitelist,
+		}
 		o.APIOptions = append(
 			o.APIOptions,
 			newOption.addMiddleware,
@@ -267,19 +282,23 @@ func WithWhitelist(whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
 }
 
 type option struct {
+	name      string
 	whitelist *whitelist.Whitelist
 }
 
 func (o *option) addMiddleware(stack *middleware.Stack) error {
 	stack.Initialize.Add(xrayMiddleware{o: o}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
-	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
+	stack.Build.Add(endMarshalMiddleware{o: o}, middleware.After)
 	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
 	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
 	return nil
 }
 
 func (o *option) insertParameter(aws schema.AWS, serviceName, operationName string, params, result any) {
+	if o.whitelist == nil {
+		return
+	}
 	service, ok := o.whitelist.Services[serviceName]
 	if !ok {
 		return
