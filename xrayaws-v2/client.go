@@ -3,6 +3,7 @@ package xrayaws
 import (
 	"context"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,7 +78,8 @@ func (m xrayMiddleware) HandleInitialize(
 	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
 ) {
 	segs := &subsegments{
-		ctx: ctx,
+		name: m.o.name,
+		ctx:  ctx,
 	}
 	ctx = context.WithValue(ctx, segmentsContextKey, segs)
 	segs.initializeTime = time.Now()
@@ -127,23 +129,59 @@ func (endMarshalMiddleware) ID() string {
 	return "XRayEndMarshalMiddleware"
 }
 
-func (endMarshalMiddleware) HandleBuild(
-	ctx context.Context, in middleware.BuildInput, next middleware.BuildHandler,
-) (
-	out middleware.BuildOutput, metadata middleware.Metadata, err error,
+func (m endMarshalMiddleware) HandleFinalize(ctx context.Context, in middleware.FinalizeInput, next middleware.FinalizeHandler) (
+	out middleware.FinalizeOutput, metadata middleware.Metadata, err error,
 ) {
 	if segs := contextSubsegments(ctx); segs != nil {
 		segs.mu.Lock()
 
-		name := awsmiddle.GetSigningName(ctx)
-		segs.name = name
-		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, name)
+		if segs.name == "" {
+			segs.name = getServiceName(ctx, in)
+		}
+		segs.awsCtx, segs.awsSeg = xray.BeginSubsegmentAt(ctx, segs.initializeTime, segs.name)
 
 		_, marshalSeg := xray.BeginSubsegmentAt(segs.awsCtx, segs.marshalTime, "marshal")
 		marshalSeg.Close()
 		segs.mu.Unlock()
 	}
-	return next.HandleBuild(ctx, in)
+	return next.HandleFinalize(ctx, in)
+}
+
+func getServiceName(ctx context.Context, in middleware.FinalizeInput) string {
+	if name := awsmiddle.GetSigningName(ctx); name != "" {
+		return name
+	}
+	req, ok := in.Request.(*smithyhttp.Request)
+	if !ok {
+		return awsmiddle.GetServiceID(ctx)
+	}
+
+	const prefix = "AWS4-HMAC-SHA256 "
+	auth := req.Header.Get("Authorization")
+	if len(auth) < len(prefix) || !strings.EqualFold(auth[:len(prefix)], prefix) {
+		return awsmiddle.GetServiceID(ctx)
+	}
+	auth = auth[len(prefix):]
+	parts := strings.Split(auth, ",")
+	for _, part := range parts {
+		key, value, ok := strings.Cut(part, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key != "Credential" {
+			continue
+		}
+
+		cred := strings.Split(value, "/")
+		if len(cred) < 4 {
+			return awsmiddle.GetServiceID(ctx)
+		}
+		return cred[3]
+	}
+
+	return awsmiddle.GetServiceID(ctx)
 }
 
 type beginAttemptMiddleware struct{}
@@ -251,13 +289,21 @@ var segmentsContextKey = &contextKey{"segments"}
 
 // WithXRay is the X-Ray tracing option.
 func WithXRay() config.LoadOptionsFunc {
-	return WithWhitelist(defaultWhitelist)
+	return WithServiceName("", defaultWhitelist)
 }
 
 // WithWhitelist returns a X-Ray tracing option with custom whitelist.
 func WithWhitelist(whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
+	return WithServiceName("", whitelist)
+}
+
+// WithServiceName returns a X-Ray tracing option with custom service name.
+func WithServiceName(name string, whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
 	return func(o *config.LoadOptions) error {
-		newOption := option{whitelist: whitelist}
+		newOption := option{
+			name:      name,
+			whitelist: whitelist,
+		}
 		o.APIOptions = append(
 			o.APIOptions,
 			newOption.addMiddleware,
@@ -267,19 +313,23 @@ func WithWhitelist(whitelist *whitelist.Whitelist) config.LoadOptionsFunc {
 }
 
 type option struct {
+	name      string
 	whitelist *whitelist.Whitelist
 }
 
 func (o *option) addMiddleware(stack *middleware.Stack) error {
 	stack.Initialize.Add(xrayMiddleware{o: o}, middleware.After)
 	stack.Serialize.Add(beginMarshalMiddleware{}, middleware.Before)
-	stack.Build.Add(endMarshalMiddleware{}, middleware.After)
+	stack.Finalize.Insert(endMarshalMiddleware{}, "Signing", middleware.After)
 	stack.Deserialize.Add(beginAttemptMiddleware{}, middleware.Before)
 	stack.Deserialize.Insert(endAttemptMiddleware{}, "OperationDeserializer", middleware.After)
 	return nil
 }
 
 func (o *option) insertParameter(aws schema.AWS, serviceName, operationName string, params, result any) {
+	if o.whitelist == nil {
+		return
+	}
 	service, ok := o.whitelist.Services[serviceName]
 	if !ok {
 		return

@@ -1,6 +1,7 @@
 package xrayaws
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,10 +14,14 @@ import (
 	"unicode"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsmiddle "github.com/aws/aws-sdk-go-v2/aws/middleware"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	smithyendpoints "github.com/aws/smithy-go/endpoints"
+	"github.com/aws/smithy-go/middleware"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
@@ -107,6 +112,7 @@ func TestClient(t *testing.T) {
 				SigningName: "lambda",
 			}, nil
 		}),
+		HTTPClient: opt.HTTPClient,
 		Retryer: func() aws.Retryer {
 			return aws.NopRetryer{}
 		},
@@ -116,6 +122,284 @@ func TestClient(t *testing.T) {
 
 	// start testing
 	svc := lambda.NewFromConfig(cfg)
+	ctx, root := xray.BeginSegment(ctx, "Test")
+	_, err = svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
+	root.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check the segment
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "Test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "lambda",
+				ID:        "xxxxxxxxxxxxxxxx",
+				Namespace: "aws",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Subsegments: []*schema.Segment{
+					{
+						Name:      "marshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "attempt",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Subsegments: []*schema.Segment{
+							{
+								Name:      "connect",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Subsegments: []*schema.Segment{
+									{
+										Name:      "dial",
+										ID:        "xxxxxxxxxxxxxxxx",
+										StartTime: timeFilled,
+										EndTime:   timeFilled,
+										Metadata: map[string]any{
+											"http": map[string]any{
+												"dial": map[string]any{
+													"network": "tcp",
+													"address": u.Host,
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Name:      "request",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+							},
+						},
+					},
+					{
+						Name:      "unmarshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+				},
+				HTTP: &schema.HTTP{
+					Response: &schema.HTTPResponse{
+						Status:        200,
+						ContentLength: 2,
+					},
+				},
+				AWS: schema.AWS{
+					"operation":  "ListFunctions",
+					"region":     "fake-moon-1",
+					"request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+					// "retries":    0.0,
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestClient_CustomServiceName(t *testing.T) {
+	// setup dummy X-Ray daemon
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	// setup dummy aws service
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if _, err := io.WriteString(w, "{}"); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt config.LoadOptions
+	WithServiceName("lunar-lambda", nil)(&opt)
+	cfg := aws.Config{
+		Region: "fake-moon-1",
+		Retryer: func() aws.Retryer {
+			return aws.NopRetryer{}
+		},
+		HTTPClient:  opt.HTTPClient,
+		APIOptions:  opt.APIOptions,
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
+	}
+
+	r := lambdaEndpointResolver(func(ctx context.Context, params lambda.EndpointParameters) (smithyendpoints.Endpoint, error) {
+		return smithyendpoints.Endpoint{
+			URI: *u,
+		}, nil
+	})
+
+	// start testing
+	svc := lambda.NewFromConfig(cfg, lambda.WithEndpointResolverV2(r))
+	ctx, root := xray.BeginSegment(ctx, "Test")
+	_, err = svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
+	root.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// check the segment
+	got, err := td.Recv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := &schema.Segment{
+		Name:      "Test",
+		ID:        "xxxxxxxxxxxxxxxx",
+		TraceID:   "x-xxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx",
+		StartTime: timeFilled,
+		EndTime:   timeFilled,
+		Subsegments: []*schema.Segment{
+			{
+				Name:      "lunar-lambda",
+				ID:        "xxxxxxxxxxxxxxxx",
+				Namespace: "aws",
+				StartTime: timeFilled,
+				EndTime:   timeFilled,
+				Subsegments: []*schema.Segment{
+					{
+						Name:      "marshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+					{
+						Name:      "attempt",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+						Subsegments: []*schema.Segment{
+							{
+								Name:      "connect",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+								Subsegments: []*schema.Segment{
+									{
+										Name:      "dial",
+										ID:        "xxxxxxxxxxxxxxxx",
+										StartTime: timeFilled,
+										EndTime:   timeFilled,
+										Metadata: map[string]any{
+											"http": map[string]any{
+												"dial": map[string]any{
+													"network": "tcp",
+													"address": u.Host,
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Name:      "request",
+								ID:        "xxxxxxxxxxxxxxxx",
+								StartTime: timeFilled,
+								EndTime:   timeFilled,
+							},
+						},
+					},
+					{
+						Name:      "unmarshal",
+						ID:        "xxxxxxxxxxxxxxxx",
+						StartTime: timeFilled,
+						EndTime:   timeFilled,
+					},
+				},
+				HTTP: &schema.HTTP{
+					Response: &schema.HTTPResponse{
+						Status:        200,
+						ContentLength: 2,
+					},
+				},
+				AWS: schema.AWS{
+					"operation":  "ListFunctions",
+					"region":     "fake-moon-1",
+					"request_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+					// "retries":    0.0,
+				},
+			},
+		},
+		Service: xray.ServiceData,
+	}
+	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
+		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+type lambdaEndpointResolver func(ctx context.Context, params lambda.EndpointParameters) (smithyendpoints.Endpoint, error)
+
+func (r lambdaEndpointResolver) ResolveEndpoint(ctx context.Context, params lambda.EndpointParameters) (smithyendpoints.Endpoint, error) {
+	return r(ctx, params)
+}
+
+func TestClient_ResolveEndpointV2(t *testing.T) {
+	// setup dummy X-Ray daemon
+	ctx, td := xray.NewTestDaemon(nil)
+	defer td.Close()
+
+	// setup dummy aws service
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if _, err := io.WriteString(w, "{}"); err != nil {
+			panic(err)
+		}
+	}))
+	defer ts.Close()
+
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var opt config.LoadOptions
+	WithXRay()(&opt)
+	cfg := aws.Config{
+		Region: "fake-moon-1",
+		Retryer: func() aws.Retryer {
+			return aws.NopRetryer{}
+		},
+		HTTPClient:  opt.HTTPClient,
+		APIOptions:  opt.APIOptions,
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
+	}
+
+	r := lambdaEndpointResolver(func(ctx context.Context, params lambda.EndpointParameters) (smithyendpoints.Endpoint, error) {
+		return smithyendpoints.Endpoint{
+			URI: *u,
+		}, nil
+	})
+
+	// start testing
+	svc := lambda.NewFromConfig(cfg, lambda.WithEndpointResolverV2(r))
 	ctx, root := xray.BeginSegment(ctx, "Test")
 	_, err = svc.ListFunctions(ctx, &lambda.ListFunctionsInput{})
 	root.Close()
@@ -585,4 +869,96 @@ func TestInsertDescriptor_value(t *testing.T) {
 	if got != "bar" {
 		t.Errorf("want bar, got %s", got)
 	}
+}
+
+func TestGetServiceName(t *testing.T) {
+	t.Run("legacySigningMethod", func(t *testing.T) {
+		ctx := awsmiddle.SetSigningName(context.Background(), "lambda")
+		if got := getServiceName(ctx, middleware.FinalizeInput{}); got != "lambda" {
+			t.Errorf("want lambda, got %s", got)
+		}
+	})
+
+	t.Run("v4SigningMethod", func(t *testing.T) {
+		ctx := context.Background()
+		in := middleware.FinalizeInput{
+			Request: &smithyhttp.Request{
+				Request: &http.Request{
+					Header: http.Header{
+						"Authorization": []string{
+							"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20231220/fake-moon-1/lambda/aws4_request, SignedHeaders=amz-sdk-invocation-id;host;x-amz-date, Signature=c2edddb0b3072e5f11ebb852a3e99ad6871e89d8ab867b41d23e7d9b6ad7ed71",
+						},
+					},
+				},
+			},
+		}
+
+		if got := getServiceName(ctx, in); got != "lambda" {
+			t.Errorf("want lambda, got %s", got)
+		}
+	})
+
+	t.Run("BadV4SigningMethod1", func(t *testing.T) {
+		ctx := awsmiddle.SetServiceID(context.Background(), "Lambda")
+		in := middleware.FinalizeInput{
+			Request: &smithyhttp.Request{
+				Request: &http.Request{
+					Header: http.Header{
+						"Authorization": []string{
+							"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20231220/fake-moon-1",
+						},
+					},
+				},
+			},
+		}
+
+		if got := getServiceName(ctx, in); got != "Lambda" {
+			t.Errorf("want Lambda, got %s", got)
+		}
+	})
+
+	t.Run("BadV4SigningMethod2", func(t *testing.T) {
+		ctx := awsmiddle.SetServiceID(context.Background(), "Lambda")
+		in := middleware.FinalizeInput{
+			Request: &smithyhttp.Request{
+				Request: &http.Request{
+					Header: http.Header{
+						"Authorization": []string{
+							"AWS4-HMAC-SHA256 SignedHeaders=amz-sdk-invocation-id;host;x-amz-date, Signature=c2edddb0b3072e5f11ebb852a3e99ad6871e89d8ab867b41d23e7d9b6ad7ed71",
+						},
+					},
+				},
+			},
+		}
+
+		if got := getServiceName(ctx, in); got != "Lambda" {
+			t.Errorf("want Lambda, got %s", got)
+		}
+	})
+
+	t.Run("BadV4SigningMethod3", func(t *testing.T) {
+		ctx := awsmiddle.SetServiceID(context.Background(), "Lambda")
+		in := middleware.FinalizeInput{
+			Request: &smithyhttp.Request{
+				Request: &http.Request{
+					Header: http.Header{
+						"Authorization": []string{
+							"Bearer c2edddb0b3072e5f11ebb852a3e99ad6871e89d8ab867b41d23e7d9b6ad7ed71",
+						},
+					},
+				},
+			},
+		}
+
+		if got := getServiceName(ctx, in); got != "Lambda" {
+			t.Errorf("want Lambda, got %s", got)
+		}
+	})
+
+	t.Run("ServiceID", func(t *testing.T) {
+		ctx := awsmiddle.SetServiceID(context.Background(), "Lambda")
+		if got := getServiceName(ctx, middleware.FinalizeInput{}); got != "Lambda" {
+			t.Errorf("want lambda, got %s", got)
+		}
+	})
 }
