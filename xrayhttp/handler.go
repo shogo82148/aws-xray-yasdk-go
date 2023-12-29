@@ -134,7 +134,11 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func getURL(r *http.Request) string {
 	proto := r.Header.Get("X-Forwarded-Proto")
-	if proto == "" {
+	if strings.EqualFold(proto, "https") {
+		proto = "https"
+	} else if strings.EqualFold(proto, "http") {
+		proto = "http"
+	} else if proto == "" {
 		if r.TLS != nil {
 			proto = "https"
 		} else {

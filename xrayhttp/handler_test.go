@@ -626,6 +626,15 @@ func TestGetURL(t *testing.T) {
 			},
 			want: "https://example.com/",
 		},
+		{
+			name: "x-forwarded-proto",
+			req: &http.Request{
+				Header: http.Header{"X-Forwarded-Proto": []string{"https"}},
+				Host:   "example.com",
+				URL:    &url.URL{Path: "/"},
+			},
+			want: "https://example.com/",
+		},
 	}
 
 	for _, tt := range tests {
@@ -652,6 +661,25 @@ func TestClientIP(t *testing.T) {
 			},
 			wantIP:    "192.0.2.1",
 			forwarded: false,
+		},
+		{
+			name: "ipv6",
+			req: &http.Request{
+				RemoteAddr: "[2001:db8::1]:48011",
+			},
+			wantIP:    "2001:db8::1",
+			forwarded: false,
+		},
+		{
+			name: "xff",
+			req: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": []string{"198.51.100.1"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
 		},
 	}
 
