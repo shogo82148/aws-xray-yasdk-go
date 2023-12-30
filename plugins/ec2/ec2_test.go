@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/go-retry"
 )
 
 func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
@@ -53,6 +54,10 @@ func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {
 	c := &client{
 		base:       ts.URL,
 		httpClient: &http.Client{},
+		timeout:    time.Second,
+		policy: &retry.Policy{
+			MaxCount: 1,
+		},
 	}
 	got, err := c.getInstanceIdentityDocument(context.Background())
 	if err != nil {
@@ -126,6 +131,10 @@ func TestGetInstanceIdentityDocument_IMDSv2(t *testing.T) {
 	c := &client{
 		base:       ts.URL,
 		httpClient: &http.Client{},
+		timeout:    time.Second,
+		policy: &retry.Policy{
+			MaxCount: 1,
+		},
 	}
 	got, err := c.getInstanceIdentityDocument(context.Background())
 	if err != nil {
@@ -221,8 +230,9 @@ func TestGetInstanceIdentityDocument_IMDSEndpointFromEnv(t *testing.T) {
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	os.Setenv("AWS_EC2_METADATA_SERVICE_ENDPOINT", ts.URL)
-	defer os.Unsetenv("AWS_EC2_METADATA_SERVICE_ENDPOINT")
+	t.Setenv("AWS_EC2_METADATA_SERVICE_ENDPOINT", ts.URL)
+	t.Setenv("AWS_METADATA_SERVICE_TIMEOUT", "1")
+	t.Setenv("AWS_METADATA_SERVICE_NUM_ATTEMPTS", "1")
 
 	Init()
 

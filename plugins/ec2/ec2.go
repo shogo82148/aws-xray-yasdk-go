@@ -29,9 +29,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/internal/envconfig"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
+	"github.com/shogo82148/go-retry"
 )
 
 type ec2InstanceIdentityDocument struct {
@@ -68,6 +70,9 @@ type client struct {
 	// TTL for token
 	ttl time.Time
 
+	timeout time.Duration
+	policy  *retry.Policy
+
 	httpClient *http.Client
 }
 
@@ -92,8 +97,14 @@ func newClient(ctx context.Context) *client {
 		}
 	}
 	base = strings.TrimSuffix(base, "/")
+	timeout := envconfig.MetadataServiceTimeout()
+
 	c := &client{
-		base: base,
+		base:    base,
+		timeout: timeout,
+		policy: &retry.Policy{
+			MaxCount: envconfig.MetadataServiceNumAttempts(),
+		},
 		httpClient: &http.Client{
 			Transport: &http.Transport{
 				// ignore proxy configure from the environment values
@@ -102,16 +113,15 @@ func newClient(ctx context.Context) *client {
 				// metadata endpoint is in same network,
 				// so timeout can be shorter.
 				DialContext: (&net.Dialer{
-					Timeout:   time.Second,
-					KeepAlive: time.Second,
+					Timeout:   timeout,
+					KeepAlive: timeout,
 					DualStack: true,
 				}).DialContext,
 				MaxIdleConns:          5,
-				IdleConnTimeout:       time.Second,
-				TLSHandshakeTimeout:   time.Second,
-				ExpectContinueTimeout: time.Second,
+				IdleConnTimeout:       timeout,
+				TLSHandshakeTimeout:   timeout,
+				ExpectContinueTimeout: timeout,
 			},
-			Timeout: time.Second,
 		},
 	}
 	return c
@@ -122,36 +132,40 @@ func (c *client) Close() {
 }
 
 func (c *client) refreshToken(ctx context.Context) error {
-	now := time.Now()
-	if c.token != "" && c.ttl.After(now) {
-		// no need to refresh
+	return c.policy.Do(ctx, func() error {
+		now := time.Now()
+		if c.token != "" && c.ttl.After(now) {
+			// no need to refresh
+			return nil
+		}
+
+		ctx, cancel := context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.base+"/latest/api/token", nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("x-aws-ec2-metadata-token-ttl-seconds", "10")
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			// IMDSv2 may be disabled; fallback to IMDSv1.
+			return nil
+		}
+
+		token, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		c.token = string(token)
+		c.ttl = now.Add(5 * time.Second)
 		return nil
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.base+"/latest/api/token", nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("x-aws-ec2-metadata-token-ttl-seconds", "10")
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		// IMDSv2 may be disabled; fallback to IMDSv1.
-		return nil
-	}
-
-	token, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	c.token = string(token)
-	c.ttl = now.Add(5 * time.Second)
-
-	return nil
+	})
 }
 
 func (c *client) getInstanceIdentityDocument(ctx context.Context) (*ec2InstanceIdentityDocument, error) {
@@ -159,29 +173,34 @@ func (c *client) getInstanceIdentityDocument(ctx context.Context) (*ec2InstanceI
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/latest/dynamic/instance-identity/document", nil)
-	if err != nil {
-		return nil, err
-	}
-	if c.token != "" {
-		req.Header.Set("x-aws-ec2-metadata-token", c.token)
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+	return retry.DoValue(ctx, c.policy, func() (*ec2InstanceIdentityDocument, error) {
+		ctx, cancel := context.WithTimeout(ctx, c.timeout)
+		defer cancel()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+"/latest/dynamic/instance-identity/document", nil)
+		if err != nil {
+			return nil, err
+		}
+		if c.token != "" {
+			req.Header.Set("x-aws-ec2-metadata-token", c.token)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	var doc ec2InstanceIdentityDocument
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&doc); err != nil {
-		return nil, err
-	}
-	return &doc, nil
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		}
+
+		var doc ec2InstanceIdentityDocument
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&doc); err != nil {
+			return nil, err
+		}
+		return &doc, nil
+	})
 }
 
 // Find logging configure of CloudWatch Agent.

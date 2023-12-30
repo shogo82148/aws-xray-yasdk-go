@@ -24,8 +24,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/internal/envconfig"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	"github.com/shogo82148/go-retry"
 )
 
 const cgroupPath = "/proc/self/cgroup"
@@ -161,8 +163,10 @@ func (meta *containerMetadata) LogReferences() []*schema.LogReference {
 }
 
 type metadataFetcher struct {
-	client *http.Client
-	url    string
+	client  *http.Client
+	url     string
+	timeout time.Duration
+	policy  *retry.Policy
 }
 
 func newMetadataFetcher() *metadataFetcher {
@@ -174,6 +178,7 @@ func newMetadataFetcher() *metadataFetcher {
 	if !strings.HasPrefix(url, "http://") {
 		return nil
 	}
+	timeout := envconfig.MetadataServiceTimeout()
 	client := &http.Client{
 		Transport: &http.Transport{
 			// ignore proxy configure from the environment values
@@ -182,41 +187,46 @@ func newMetadataFetcher() *metadataFetcher {
 			// metadata endpoint is in same network,
 			// so timeout can be shorter.
 			DialContext: (&net.Dialer{
-				Timeout:   time.Second,
-				KeepAlive: time.Second,
+				Timeout:   timeout,
+				KeepAlive: timeout,
 				DualStack: true,
 			}).DialContext,
 			MaxIdleConns:          5,
-			IdleConnTimeout:       time.Second,
-			TLSHandshakeTimeout:   time.Second,
-			ExpectContinueTimeout: time.Second,
+			IdleConnTimeout:       timeout,
+			TLSHandshakeTimeout:   timeout,
+			ExpectContinueTimeout: timeout,
 		},
-		Timeout: time.Second,
 	}
 	return &metadataFetcher{
-		client: client,
-		url:    url,
+		client:  client,
+		url:     url,
+		timeout: timeout,
+		policy: &retry.Policy{
+			MaxCount: envconfig.MetadataServiceNumAttempts(),
+		},
 	}
 }
 
 func (c *metadataFetcher) Fetch(ctx context.Context) (*containerMetadata, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
-	if err != nil {
-		return nil, err
-	}
+	return retry.DoValue(ctx, c.policy, func() (*containerMetadata, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+		resp, err := c.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
 
-	var data containerMetadata
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&data); err != nil {
-		return nil, err
-	}
-	return &data, nil
+		var data containerMetadata
+		dec := json.NewDecoder(resp.Body)
+		if err := dec.Decode(&data); err != nil {
+			return nil, err
+		}
+		return &data, nil
+	})
 }
 
 func (c *metadataFetcher) Close() {
