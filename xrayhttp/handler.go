@@ -12,6 +12,7 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/sampling"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
+	forwardedheader "github.com/shogo82148/forwarded-header"
 )
 
 //go:generate go run codegen.go
@@ -133,6 +134,14 @@ func (tracer *httpTracer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func getURL(r *http.Request) string {
+	forwarded, err := forwardedheader.Parse(r.Header.Values("Forwarded"))
+	if err == nil && len(forwarded) > 0 {
+		proto := forwarded[0].Proto
+		host := forwarded[0].Host
+		if proto != "" && host != "" {
+			return proto + "://" + host + r.URL.Path
+		}
+	}
 	proto := r.Header.Get("X-Forwarded-Proto")
 	if strings.EqualFold(proto, "https") {
 		proto = "https"
@@ -149,6 +158,13 @@ func getURL(r *http.Request) string {
 }
 
 func clientIP(r *http.Request) (string, bool) {
+	forwarded, err := forwardedheader.Parse(r.Header.Values("Forwarded"))
+	if err == nil && len(forwarded) > 0 {
+		ip := forwarded[0].For.IP
+		if ip.IsValid() {
+			return ip.String(), true
+		}
+	}
 	forwardedFor := r.Header.Get("X-Forwarded-For")
 	if forwardedFor != "" {
 		if idx := strings.IndexByte(forwardedFor, ','); idx > 0 {

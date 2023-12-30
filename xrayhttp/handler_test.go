@@ -681,6 +681,17 @@ func TestClientIP(t *testing.T) {
 			wantIP:    "198.51.100.1",
 			forwarded: true,
 		},
+		{
+			name: "forwarded-header",
+			req: &http.Request{
+				Header: http.Header{
+					"Forwarded": []string{"for=198.51.100.1"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
+		},
 	}
 
 	for _, tt := range tests {
