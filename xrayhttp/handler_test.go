@@ -2,10 +2,12 @@ package xrayhttp
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -598,5 +600,109 @@ func TestHandler_Panic(t *testing.T) {
 	}
 	if diff := cmp.Diff(want, got, ignoreVariableField); diff != "" {
 		t.Errorf("mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestGetURL(t *testing.T) {
+	tests := []struct {
+		name string
+		req  *http.Request
+		want string
+	}{
+		{
+			name: "simple",
+			req: &http.Request{
+				Host: "example.com",
+				URL:  &url.URL{Path: "/"},
+			},
+			want: "http://example.com/",
+		},
+		{
+			name: "https",
+			req: &http.Request{
+				Host: "example.com",
+				URL:  &url.URL{Path: "/"},
+				TLS:  &tls.ConnectionState{},
+			},
+			want: "https://example.com/",
+		},
+		{
+			name: "x-forwarded-proto",
+			req: &http.Request{
+				Header: http.Header{"X-Forwarded-Proto": []string{"https"}},
+				Host:   "example.com",
+				URL:    &url.URL{Path: "/"},
+			},
+			want: "https://example.com/",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := getURL(tt.req)
+			if got != tt.want {
+				t.Errorf("want %s, got %s", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestClientIP(t *testing.T) {
+	tests := []struct {
+		name      string
+		req       *http.Request
+		wantIP    string
+		forwarded bool
+	}{
+		{
+			name: "simple",
+			req: &http.Request{
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "192.0.2.1",
+			forwarded: false,
+		},
+		{
+			name: "ipv6",
+			req: &http.Request{
+				RemoteAddr: "[2001:db8::1]:48011",
+			},
+			wantIP:    "2001:db8::1",
+			forwarded: false,
+		},
+		{
+			name: "xff",
+			req: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": []string{"198.51.100.1"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
+		},
+		{
+			name: "forwarded-header",
+			req: &http.Request{
+				Header: http.Header{
+					"Forwarded": []string{"for=198.51.100.1"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotIP, forwarded := clientIP(tt.req)
+			if gotIP != tt.wantIP {
+				t.Errorf("want %s, got %s", tt.wantIP, gotIP)
+			}
+			if forwarded != tt.forwarded {
+				t.Errorf("want %t, got %t", tt.forwarded, forwarded)
+			}
+		})
 	}
 }
