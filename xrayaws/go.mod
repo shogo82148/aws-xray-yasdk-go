@@ -8,4 +8,7 @@ require (
 	github.com/shogo82148/aws-xray-yasdk-go v1.7.4
 )
 
-require github.com/jmespath/go-jmespath v0.4.0 // indirect
+require (
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/shogo82148/forwarded-header v0.1.0 // indirect
+)

@@ -26,4 +26,5 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.6 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/shogo82148/forwarded-header v0.1.0 // indirect
 )

@@ -41,6 +41,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/shogo82148/aws-xray-yasdk-go v1.7.4 h1:lImR7K/WbPoFqb6BGM/xnpGD2s4JnQ3WV7thWjDdjG0=
 github.com/shogo82148/aws-xray-yasdk-go v1.7.4/go.mod h1:Ou0BdxWM2H5u5FAcTqYUn08XSv+opM56jDULW8MLCRA=
+github.com/shogo82148/forwarded-header v0.1.0 h1:OZX131i0B8GGZR+s5QEZdSEYDTUPkUX8ISIIQE+swKM=
+github.com/shogo82148/forwarded-header v0.1.0/go.mod h1:Ge73zEgn9jrdyf65vWTgDmRZQFQPHoFU0TaILJcvs54=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.2.8/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
