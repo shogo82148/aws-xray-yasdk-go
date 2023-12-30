@@ -25,11 +25,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/shogo82148/aws-xray-yasdk-go/internal/envconfig"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
@@ -97,13 +97,13 @@ func newClient(ctx context.Context) *client {
 		}
 	}
 	base = strings.TrimSuffix(base, "/")
-	timeout := getTimeout()
+	timeout := envconfig.MetadataServiceTimeout()
 
 	c := &client{
 		base:    base,
 		timeout: timeout,
 		policy: &retry.Policy{
-			MaxCount: getNumAttempts(),
+			MaxCount: envconfig.MetadataServiceNumAttempts(),
 		},
 		httpClient: &http.Client{
 			Transport: &http.Transport{
@@ -125,34 +125,6 @@ func newClient(ctx context.Context) *client {
 		},
 	}
 	return c
-}
-
-func getTimeout() time.Duration {
-	const defaultTimeout = time.Second
-
-	timeout := os.Getenv("AWS_METADATA_SERVICE_TIMEOUT")
-	if timeout == "" {
-		return defaultTimeout
-	}
-	d, err := strconv.ParseInt(timeout, 10, 64)
-	if err != nil {
-		return defaultTimeout
-	}
-	return time.Duration(d) * time.Second
-}
-
-func getNumAttempts() int {
-	const defaultNumAttempts = 1
-
-	attempts := os.Getenv("AWS_METADATA_SERVICE_NUM_ATTEMPTS")
-	if attempts == "" {
-		return defaultNumAttempts
-	}
-	n, err := strconv.ParseInt(attempts, 10, 0)
-	if err != nil {
-		return defaultNumAttempts
-	}
-	return int(n)
 }
 
 func (c *client) Close() {

@@ -80,8 +80,9 @@ func TestMetadataFetcher(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	os.Setenv("ECS_CONTAINER_METADATA_URI_V4", ts.URL)
-	defer os.Unsetenv("ECS_CONTAINER_METADATA_URI_V4")
+	t.Setenv("ECS_CONTAINER_METADATA_URI_V4", ts.URL)
+	t.Setenv("AWS_METADATA_SERVICE_TIMEOUT", "")
+	t.Setenv("AWS_METADATA_SERVICE_NUM_ATTEMPTS", "")
 
 	c := newMetadataFetcher()
 	if c == nil {
