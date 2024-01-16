@@ -157,7 +157,18 @@ func getURL(r *http.Request) string {
 	return proto + "://" + r.Host + r.URL.Path
 }
 
+// clientIP returns the client IP address from the request.
+//
+// If the request passes through a proxy, clientIP parses
+// the Forwarded header and the X-Forwarded-For header to
+// find the client IP address.
+// The clientIP always trusts the values of the Forwarded header
+// and the X-Forwarded-For header. Please note
+// that if these headers have been altered by an attacker,
+// there is a possibility of returning incorrect results.
 func clientIP(r *http.Request) (string, bool) {
+	// Parse Forwarded header.
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Forwarded
 	forwarded, err := forwardedheader.Parse(r.Header.Values("Forwarded"))
 	if err == nil && len(forwarded) > 0 {
 		ip := forwarded[0].For.IP
@@ -165,18 +176,31 @@ func clientIP(r *http.Request) (string, bool) {
 			return ip.String(), true
 		}
 	}
+
+	// Parse X-Forwarded-For header.
+	// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
 	forwardedFor := r.Header.Get("X-Forwarded-For")
 	if forwardedFor != "" {
 		if idx := strings.IndexByte(forwardedFor, ','); idx > 0 {
 			forwardedFor = forwardedFor[:idx]
 		}
-		return strings.TrimSpace(forwardedFor), true
+		forwardedFor = strings.TrimSpace(forwardedFor)
+
+		// some proxies may add port number to X-Forwarded-For header.
+		// e.g. AWS ALB: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/x-forwarded-headers.html
+		return getHost(forwardedFor), true
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	return getHost(r.RemoteAddr), false
+}
+
+// getHost splits host and port from s.
+// if s doesn't contain port, it returns s.
+func getHost(s string) string {
+	ip, _, err := net.SplitHostPort(s)
 	if err != nil {
-		return r.RemoteAddr, false
+		return s
 	}
-	return ip, false
+	return ip
 }
 
 type rwUnwrapper interface {

@@ -682,6 +682,39 @@ func TestClientIP(t *testing.T) {
 			forwarded: true,
 		},
 		{
+			name: "xff-ipv6",
+			req: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": []string{"2001:db8::1"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "2001:db8::1",
+			forwarded: true,
+		},
+		{
+			name: "multiple-xff",
+			req: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": []string{"198.51.100.1, 198.51.100.2"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
+		},
+		{
+			name: "xff-with-port",
+			req: &http.Request{
+				Header: http.Header{
+					"X-Forwarded-For": []string{"198.51.100.1:48013, 198.51.100.2:48012"},
+				},
+				RemoteAddr: "192.0.2.1:48011",
+			},
+			wantIP:    "198.51.100.1",
+			forwarded: true,
+		},
+		{
 			name: "forwarded-header",
 			req: &http.Request{
 				Header: http.Header{
