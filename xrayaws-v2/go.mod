@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.10
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.10
-	github.com/aws/aws-sdk-go-v2/service/lambda v1.53.4
+	github.com/aws/aws-sdk-go-v2/service/lambda v1.54.0
 	github.com/aws/smithy-go v1.20.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0
