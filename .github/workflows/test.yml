@@ -1,9 +1,6 @@
 name: Test
 on: [push, pull_request]
 
-env:
-  GO111MODULE: "on"
-
 jobs:
   test:
     name: Go ${{ matrix.go }} Test on ${{ matrix.os }}
@@ -17,17 +14,10 @@ jobs:
           - macos-latest
         go:
           - "stable"
+          - "1.22"
           - "1.21"
           - "1.20"
           - "1.19"
-          - "1.18"
-        goexperiment: [""]
-        include:
-          # test with GOEXPERIMENT=loopvar
-          # https://github.com/golang/go/wiki/LoopvarExperiment
-          - go: "1.21"
-            os: ubuntu-latest
-            goexperiment: "loopvar"
 
     steps:
       - name: Check out code
@@ -44,8 +34,6 @@ jobs:
           make test-xrayaws
           make test-xrayaws-v2
         shell: bash
-        env:
-          GOEXPERIMENT: ${{ matrix.goexperiment }}
 
       - name: Send coverage
         uses: shogo82148/actions-goveralls@v1
