@@ -10,7 +10,7 @@ require (
 	github.com/aws/smithy-go v1.20.2
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-cmp v0.6.0
-	github.com/shogo82148/aws-xray-yasdk-go v1.8.0
+	github.com/shogo82148/aws-xray-yasdk-go v1.8.1
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
