@@ -27,7 +27,7 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/internal/envconfig"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
-	"github.com/shogo82148/go-retry"
+	"github.com/shogo82148/go-retry/v2"
 )
 
 const cgroupPath = "/proc/self/cgroup"

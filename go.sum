@@ -2,5 +2,5 @@ github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/shogo82148/forwarded-header v0.1.0 h1:OZX131i0B8GGZR+s5QEZdSEYDTUPkUX8ISIIQE+swKM=
 github.com/shogo82148/forwarded-header v0.1.0/go.mod h1:Ge73zEgn9jrdyf65vWTgDmRZQFQPHoFU0TaILJcvs54=
-github.com/shogo82148/go-retry v1.3.1 h1:AFJHUWG7mLzLFN/21p3NdzdL55ttZgdapWaFgbtYf8g=
-github.com/shogo82148/go-retry v1.3.1/go.mod h1:wttfgfwCMQvNqv4kOpqIvDDJeSmwU+AEIpUyG+5Ca6M=
+github.com/shogo82148/go-retry/v2 v2.0.1 h1:GV20np5IPU+pjFuNzFwmkFK90Lw3g4HhKgMVHewclb8=
+github.com/shogo82148/go-retry/v2 v2.0.1/go.mod h1:Rv6PnVPeGd1695eqstyZ+VFOQN8vsh5t87/Ur+aa9JI=
