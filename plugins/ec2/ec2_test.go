@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
-	"github.com/shogo82148/go-retry"
+	"github.com/shogo82148/go-retry/v2"
 )
 
 func TestGetInstanceIdentityDocument_IMDSv1(t *testing.T) {

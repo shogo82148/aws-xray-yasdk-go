@@ -33,7 +33,7 @@ import (
 	"github.com/shogo82148/aws-xray-yasdk-go/xray"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/schema"
 	"github.com/shogo82148/aws-xray-yasdk-go/xray/xraylog"
-	"github.com/shogo82148/go-retry"
+	"github.com/shogo82148/go-retry/v2"
 )
 
 type ec2InstanceIdentityDocument struct {
