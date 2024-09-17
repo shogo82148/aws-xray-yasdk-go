@@ -1,6 +1,6 @@
 module github.com/shogo82148/aws-xray-yasdk-go/xrayaws
 
-go 1.18
+go 1.21
 
 require (
 	github.com/aws/aws-sdk-go v1.55.0
