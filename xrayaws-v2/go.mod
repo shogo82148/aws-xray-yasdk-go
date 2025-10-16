@@ -1,13 +1,13 @@
 module github.com/shogo82148/aws-xray-yasdk-go/xrayaws-v2
 
-go 1.22
+go 1.23
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.38.0
 	github.com/aws/aws-sdk-go-v2/config v1.31.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.4
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.76.0
-	github.com/aws/smithy-go v1.22.5
+	github.com/aws/smithy-go v1.23.1
 	github.com/google/go-cmp v0.7.0
 	github.com/shogo82148/aws-xray-yasdk-go v1.8.1
 )
