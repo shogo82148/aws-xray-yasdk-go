@@ -135,7 +135,7 @@ func (db *fakeDB) fetchExpected(v any) error {
 	defer db.mu.Unlock()
 
 	ptr := reflect.ValueOf(v)
-	if ptr.Kind() != reflect.Ptr || ptr.IsNil() {
+	if ptr.Kind() != reflect.Pointer || ptr.IsNil() {
 		return fmt.Errorf("unsupported type: %v", ptr.Type())
 	}
 	ptr = ptr.Elem()

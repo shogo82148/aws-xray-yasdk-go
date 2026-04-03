@@ -94,7 +94,7 @@ func TestCentralizedQuota_Sample(t *testing.T) {
 	}
 
 	// first 5 requests consume the quota of the current epoch
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !quota.Sample() {
 			t.Errorf("want true, got false")
 		}
@@ -112,7 +112,7 @@ func TestCentralizedQuota_Sample(t *testing.T) {
 
 	// next epoch
 	now++
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !quota.Sample() {
 			t.Errorf("want true, got false")
 		}

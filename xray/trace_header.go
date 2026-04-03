@@ -42,15 +42,15 @@ type TraceHeader struct {
 func ParseTraceHeader(s string) TraceHeader {
 	var header TraceHeader
 	s = strings.TrimSpace(s)
-	for _, kv := range strings.Split(s, ";") {
+	for kv := range strings.SplitSeq(s, ";") {
 		kv := strings.TrimSpace(kv)
-		idx := strings.IndexByte(kv, '=')
-		if idx < 0 {
+		before, after, ok := strings.Cut(kv, "=")
+		if !ok {
 			// ignore invalid parameter
 			continue
 		}
-		key := kv[:idx]
-		value := kv[idx+1:]
+		key := before
+		value := after
 		switch {
 		case strings.EqualFold(key, "Root"):
 			header.TraceID = strings.ToLower(value)

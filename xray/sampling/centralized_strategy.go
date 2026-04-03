@@ -502,10 +502,7 @@ func (s *CentralizedStrategy) refreshQuota() {
 
 	var needRefresh bool
 	for len(stats) > 0 {
-		l := len(stats)
-		if l > maxTargets {
-			l = maxTargets
-		}
+		l := min(len(stats), maxTargets)
 		resp, err := s.getSamplingTargets(ctx, &getSamplingTargetsInput{
 			SamplingStatisticsDocuments: stats[:l],
 		})

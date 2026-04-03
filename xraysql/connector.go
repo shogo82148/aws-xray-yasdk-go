@@ -195,7 +195,7 @@ func newDBAttribute(ctx context.Context, driverName string, d driver.Driver, con
 
 func getDriverVersion(d driver.Driver) string {
 	t := reflect.TypeOf(d)
-	for t.Kind() == reflect.Ptr {
+	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	pkg := t.PkgPath()

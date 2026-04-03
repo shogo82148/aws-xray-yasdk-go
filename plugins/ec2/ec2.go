@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -273,12 +274,10 @@ func (w *jsonWalker) Walk(v any) {
 }
 
 func appendIfNotExists(slice []string, s string) []string {
-	for _, v := range slice {
-		if v == s {
-			// s is already in slice
-			// no need to append it
-			return slice
-		}
+	if slices.Contains(slice, s) {
+		// s is already in slice
+		// no need to append it
+		return slice
 	}
 	return append(slice, s)
 }

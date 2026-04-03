@@ -127,7 +127,7 @@ func (meta *containerMetadata) AccountID() string {
 	arn := meta.ContainerARN
 
 	// trim "arn:aws:ecs:${AWS::Region}:"
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		idx := strings.IndexByte(arn, ':')
 		if idx < 0 {
 			return ""
@@ -135,11 +135,11 @@ func (meta *containerMetadata) AccountID() string {
 		arn = arn[idx+1:]
 	}
 
-	idx := strings.IndexByte(arn, ':')
-	if idx < 0 {
+	before, _, ok := strings.Cut(arn, ":")
+	if !ok {
 		return ""
 	}
-	return arn[:idx]
+	return before
 }
 
 func (meta *containerMetadata) LogReferences() []*schema.LogReference {
