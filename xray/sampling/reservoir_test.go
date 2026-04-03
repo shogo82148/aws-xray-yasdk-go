@@ -14,7 +14,7 @@ func TestReservoir(t *testing.T) {
 		capacity: 5,
 	}
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !r.Take() {
 			t.Errorf("want true, got false")
 		}
@@ -27,7 +27,7 @@ func TestReservoir(t *testing.T) {
 	// reset counter in next second
 	now++
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if !r.Take() {
 			t.Errorf("want true, got false")
 		}

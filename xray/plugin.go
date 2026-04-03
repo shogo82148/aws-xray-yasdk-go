@@ -75,7 +75,7 @@ func getVersion() string {
 	}
 
 	// get the package path of the sdk
-	typ := reflect.TypeOf(xrayPlugin{})
+	typ := reflect.TypeFor[xrayPlugin]()
 	pkg := typ.PkgPath()
 
 	version := Version

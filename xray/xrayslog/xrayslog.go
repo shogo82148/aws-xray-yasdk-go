@@ -1,6 +1,3 @@
-//go:build go1.21
-// +build go1.21
-
 // Package xrayslog provides utilities for interfacing with the slog package.
 package xrayslog
 
