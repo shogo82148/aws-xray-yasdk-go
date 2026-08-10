@@ -35,13 +35,13 @@ jobs:
         shell: bash
 
       - name: Send coverage
-        uses: shogo82148/actions-goveralls@9606dbc5ac5cf888a0e9ef901515c3cd516a2790 # v1.11.0
+        uses: shogo82148/actions-goveralls@8781f5dd05b691c4dd042d5e859c11c73e0104fa # v1.11.1
         with:
           path-to-profile: profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}
           parallel: true
       - name: Send coverage of xrayaws
-        uses: shogo82148/actions-goveralls@9606dbc5ac5cf888a0e9ef901515c3cd516a2790 # v1.11.0
+        uses: shogo82148/actions-goveralls@8781f5dd05b691c4dd042d5e859c11c73e0104fa # v1.11.1
         with:
           path-to-profile: profile.cov
           flag-name: OS-${{ matrix.os }}-Go-${{ matrix.go }}-xrayaws-v1
@@ -55,6 +55,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: shogo82148/actions-goveralls@9606dbc5ac5cf888a0e9ef901515c3cd516a2790 # v1.11.0
+      - uses: shogo82148/actions-goveralls@8781f5dd05b691c4dd042d5e859c11c73e0104fa # v1.11.1
         with:
           parallel-finished: true
