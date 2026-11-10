@@ -4,6 +4,6 @@ go 1.24
 
 require (
 	github.com/google/go-cmp v0.7.0
-	github.com/shogo82148/forwarded-header v0.1.0
+	github.com/shogo82148/forwarded-header v0.2.0
 	github.com/shogo82148/go-retry/v2 v2.0.2
 )
